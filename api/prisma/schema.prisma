@@ -30,6 +30,7 @@ model Ride {
 
   @@unique([passengerId, idempotencyKey], map: "uq_ride_idempotency")
   @@index([passengerId, createdAt])
+  @@index([driverId, createdAt])
   @@index([status, createdAt])
   @@map("rides")
 }

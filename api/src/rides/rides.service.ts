@@ -28,6 +28,11 @@ export const toResponse = (ride: Ride) => ({
   updatedAt: ride.updatedAt,
 });
 
+function listFilter(user: User, available: boolean) {
+  if (user.role === 'passageiro') return { passengerId: user.id };
+  return available ? { status: 'requested' as const } : { driverId: user.id };
+}
+
 const isUniqueViolation = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
@@ -57,13 +62,9 @@ export class RidesService {
     return toResponse(ride);
   }
 
-  async list(user: User, limit: number) {
-    const where =
-      user.role === 'passageiro'
-        ? { passengerId: user.id }
-        : { OR: [{ status: 'requested' as const }, { driverId: user.id }] };
+  async list(user: User, available: boolean, limit: number) {
     const rides = await this.prisma.ride.findMany({
-      where,
+      where: listFilter(user, available),
       orderBy: { createdAt: 'desc' },
       take: limit,
     });

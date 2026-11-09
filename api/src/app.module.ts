@@ -14,6 +14,7 @@ import { RidesService } from './rides/rides.service.js';
   imports: [
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: config.rateLimit.requestsPerMinute }],
+      errorMessage: 'muitas requisições; tente de novo em instantes',
     }),
   ],
   controllers: [RidesController, HealthController],

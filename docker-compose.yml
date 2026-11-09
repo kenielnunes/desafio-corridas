@@ -41,9 +41,13 @@ services:
 
   rabbitmq:
     image: rabbitmq:4.3.7-management-alpine
+    # o RabbitMQ guarda os dados por nome de nó, que vem do hostname; fixo, o volume sobrevive ao container
+    hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: corridas
       RABBITMQ_DEFAULT_PASS: corridas_dev
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
     ports:
       - '127.0.0.1:15672:15672'
     healthcheck:
@@ -67,3 +71,4 @@ services:
 volumes:
   mysql-data:
   mongo-data:
+  rabbitmq-data:

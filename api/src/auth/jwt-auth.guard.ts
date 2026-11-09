@@ -7,6 +7,7 @@ import { IS_PUBLIC } from './decorators.js';
 import { type AuthenticatedRequest, ClaimsSchema } from './user.js';
 
 const ALLOWED_ALGORITHMS = ['RS256'];
+const BEARER_SCHEME = /^Bearer +(\S+)$/i;
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -23,10 +24,10 @@ export class JwtAuthGuard implements CanActivate {
 
     const http = context.switchToHttp();
     const request = http.getRequest<AuthenticatedRequest>();
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    const [, token] = BEARER_SCHEME.exec(request.headers.authorization ?? '') ?? [];
 
     try {
-      if (type !== 'Bearer' || !token) throw new Error('token ausente');
+      if (!token) throw new Error('token ausente');
       const { payload } = await jwtVerify(token, await this.publicKey, {
         algorithms: ALLOWED_ALGORITHMS,
         issuer: config.jwt.issuer,

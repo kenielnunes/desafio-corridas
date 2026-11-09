@@ -12,7 +12,7 @@ RUN pnpm --filter @corridas/api exec prisma generate && pnpm --filter @corridas/
 
 FROM base AS runtime
 ENV NODE_ENV=production
-RUN pnpm install --frozen-lockfile --filter @corridas/api --prod
+RUN pnpm install --frozen-lockfile --filter @corridas/api --prod && rm -rf /root/.cache /root/.local/share/pnpm
 COPY api/prisma api/prisma
 COPY api/prisma.config.ts api/
 COPY --from=build /repo/api/dist api/dist

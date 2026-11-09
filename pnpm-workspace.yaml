@@ -5,3 +5,7 @@ packages:
   - e2e
 
 minimumReleaseAge: 1440
+
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true

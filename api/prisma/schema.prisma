@@ -1,0 +1,35 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum RideStatus {
+  requested
+  accepted
+  in_progress
+  finished
+}
+
+model Ride {
+  id             String     @id @default(uuid(7)) @db.Char(36)
+  passengerId    String     @map("passenger_id") @db.VarChar(64)
+  driverId       String?    @map("driver_id") @db.VarChar(64)
+  origin         String     @db.VarChar(200)
+  destination    String     @db.VarChar(200)
+  status         RideStatus @default(requested)
+  version        Int        @default(1)
+  idempotencyKey String     @map("idempotency_key") @db.VarChar(100)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@unique([passengerId, idempotencyKey], map: "uq_ride_idempotency")
+  @@index([passengerId, createdAt])
+  @@index([status, createdAt])
+  @@map("rides")
+}

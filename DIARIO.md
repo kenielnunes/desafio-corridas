@@ -15,3 +15,12 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
   - **RabbitMQ sem hostname fixo:** o nome do nó vem do hostname, e os dados ficam numa pasta com esse nome. Cada container novo ganhava um nome aleatório, então um `down`/`up` perderia as filas.
   - **TypeScript 6:** a opção `types` passou a ser vazia por padrão, e sem `"types": ["node"]` nem `process` é encontrado.
 - Decidi não criar o banco "shadow" que o `prisma migrate dev` exige (o usuário da aplicação não pode criar bancos, e não quero dar esse privilégio a ele). Vou gerar as migrações com `prisma migrate diff`, que não precisa desse banco.
+
+## 2026-11-09 (Fase 1: API)
+
+- O Prisma 7 exige a `DATABASE_URL` até para o `prisma generate`, que nem conecta no banco: o helper `env()` do `prisma.config.ts` lança erro se a variável faltar. Troquei por `process.env.DATABASE_URL ?? ''`. O generate passou a funcionar sem URL, e o `migrate deploy` sem URL falha com "Connection url is empty", que é claro.
+- O pnpm 12 parou o `install` com `ERR_PNPM_IGNORED_BUILDS`: ele só roda scripts de instalação de pacotes liberados explicitamente. Liberei só os dois do Prisma (`allowBuilds`).
+- A API não subiu porque a porta 3000 estava ocupada por outro projeto meu. Deixei a porta do host configurável (`API_PORT`), com 3000 como padrão. Quem for avaliar pode ter o mesmo problema.
+- O smoke com `curl` pegou um bug: finalizar uma corrida que ninguém aceitou respondia 403 "a corrida é de outro motorista". A corrida não tinha motorista (`driver_id` nulo), e o código tratava "não é minha" como "é de outro". A decisão entre 403 e 409 virou uma função pura, com teste para os quatro casos.
+- Os testes de API passaram na primeira rodada e falharam na segunda: a suíte esbarrou no próprio rate limit de 10 criações por minuto. Gerei mais duas personas e distribuí as criações, no máximo 3 por persona por rodada. Rodei 3 vezes seguidas para confirmar.
+- Lendo o código do `@nestjs/throttler`, vi que a chave do contador é controller + método + usuário. O limite vale por usuário **em cada rota**, e não como um total por usuário. Ajustei a documentação para dizer exatamente isso.

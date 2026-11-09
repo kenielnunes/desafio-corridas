@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/generated
+**/coverage
+**/test-results
+**/playwright-report
+**/.env*
+.git
+.github
+auth-dev
+*.pdf

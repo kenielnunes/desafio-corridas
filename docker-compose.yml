@@ -8,19 +8,24 @@ services:
       MYSQL_USER: corridas
       MYSQL_PASSWORD: corridas_dev
       MYSQL_ROOT_PASSWORD: root_dev
+      MYSQL_ROOT_HOST: localhost
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      # TCP em 127.0.0.1 de propósito: durante o init o mysqld roda sem rede e só responderia pelo socket
-      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      # TCP em 127.0.0.1 de propósito: durante o init o mysqld roda sem rede e só responderia pelo socket.
+      # Sem credencial: o ping retorna sucesso mesmo com acesso negado, o que basta para saber que o servidor está no ar.
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '--silent']
       interval: 5s
       timeout: 5s
       retries: 30
 
   redis:
     image: redis:8.10.3-alpine
+    command: ['redis-server', '--requirepass', 'redis_dev']
+    environment:
+      REDISCLI_AUTH: redis_dev
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
       interval: 5s
       timeout: 3s
       retries: 20

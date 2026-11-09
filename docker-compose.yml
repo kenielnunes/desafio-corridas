@@ -33,7 +33,8 @@ services:
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      # pelo hostname e não por 127.0.0.1: durante o init o mongod temporário só escuta em localhost
+      test: ['CMD-SHELL', 'mongosh --quiet --host "$$(hostname)" --eval "db.adminCommand({ping:1}).ok"']
       interval: 5s
       timeout: 5s
       retries: 30

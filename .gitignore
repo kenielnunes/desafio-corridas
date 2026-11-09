@@ -10,3 +10,10 @@ test-results/
 playwright-report/
 blob-report/
 *.pdf
+*.pem
+*.key
+*.har
+**/.auth/
+docker-compose.override.yml
+.claude/settings.local.json
+CLAUDE.local.md

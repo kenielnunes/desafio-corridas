@@ -15,10 +15,6 @@ export function previousStatus(target: TargetStatus): RideStatus {
   return PREVIOUS_STATUS[target];
 }
 
-export function isTransitionAllowed(current: RideStatus, target: TargetStatus): boolean {
-  return PREVIOUS_STATUS[target] === current;
-}
-
 export function requiresAssignedDriver(target: TargetStatus): boolean {
   return target !== 'accepted';
 }

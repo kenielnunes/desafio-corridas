@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canRead, isTransitionAllowed, rejectionReason, requiresAssignedDriver } from './rules.js';
+import { canRead, previousStatus, rejectionReason, requiresAssignedDriver } from './rules.js';
 
 const passenger1 = { id: 'passageiro-1', role: 'passageiro' } as const;
 const passenger2 = { id: 'passageiro-2', role: 'passageiro' } as const;
@@ -7,17 +7,10 @@ const driver1 = { id: 'motorista-1', role: 'motorista' } as const;
 const driver2 = { id: 'motorista-2', role: 'motorista' } as const;
 
 describe('transições de status', () => {
-  it('segue a ordem solicitada, aceita, em_andamento, finalizada', () => {
-    expect(isTransitionAllowed('requested', 'accepted')).toBe(true);
-    expect(isTransitionAllowed('accepted', 'in_progress')).toBe(true);
-    expect(isTransitionAllowed('in_progress', 'finished')).toBe(true);
-  });
-
-  it('recusa pular etapas ou voltar', () => {
-    expect(isTransitionAllowed('requested', 'finished')).toBe(false);
-    expect(isTransitionAllowed('requested', 'in_progress')).toBe(false);
-    expect(isTransitionAllowed('finished', 'accepted')).toBe(false);
-    expect(isTransitionAllowed('accepted', 'accepted')).toBe(false);
+  it('cada status só pode vir do anterior na sequência', () => {
+    expect(previousStatus('accepted')).toBe('requested');
+    expect(previousStatus('in_progress')).toBe('accepted');
+    expect(previousStatus('finished')).toBe('in_progress');
   });
 
   it('só iniciar e finalizar exigem o motorista da corrida', () => {

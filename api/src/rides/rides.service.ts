@@ -88,6 +88,11 @@ export class RidesService {
     if (rejectionReason(ride, driverId, target) === 'other_driver') {
       throw new ForbiddenException('a corrida é de outro motorista');
     }
-    throw new ConflictException(`não é possível passar de ${ride.status} para ${target}`);
+    const canSeeStatus = canRead(ride, { id: driverId, role: 'motorista' });
+    throw new ConflictException(
+      canSeeStatus
+        ? `não é possível passar de ${ride.status} para ${target}`
+        : 'mudança de status não permitida',
+    );
   }
 }

@@ -7,7 +7,13 @@ import {
 import type { User } from '../auth/user.js';
 import { Prisma, type Ride } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma.service.js';
-import { canRead, previousStatus, requiresAssignedDriver, type TargetStatus } from './rules.js';
+import {
+  canRead,
+  previousStatus,
+  rejectionReason,
+  requiresAssignedDriver,
+  type TargetStatus,
+} from './rules.js';
 import type { CreateRide } from './schemas.js';
 
 export const toResponse = (ride: Ride) => ({
@@ -78,7 +84,7 @@ export class RidesService {
     const ride = await this.prisma.ride.findUnique({ where: { id } });
     if (!ride) throw new NotFoundException('corrida não encontrada');
     if (count === 1) return toResponse(ride);
-    if (requiresAssignedDriver(target) && ride.driverId !== driverId) {
+    if (rejectionReason(ride, driverId, target) === 'other_driver') {
       throw new ForbiddenException('a corrida é de outro motorista');
     }
     throw new ConflictException(`não é possível passar de ${ride.status} para ${target}`);

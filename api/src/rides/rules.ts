@@ -23,6 +23,17 @@ export function requiresAssignedDriver(target: TargetStatus): boolean {
   return target !== 'accepted';
 }
 
+export function rejectionReason(
+  ride: RideForRules,
+  driverId: string,
+  target: TargetStatus,
+): 'other_driver' | 'invalid_transition' {
+  const belongsToOtherDriver = ride.driverId !== null && ride.driverId !== driverId;
+  return requiresAssignedDriver(target) && belongsToOtherDriver
+    ? 'other_driver'
+    : 'invalid_transition';
+}
+
 export function canRead(ride: RideForRules, user: User): boolean {
   if (user.role === 'passageiro') return ride.passengerId === user.id;
   return ride.status === 'requested' || ride.driverId === user.id;

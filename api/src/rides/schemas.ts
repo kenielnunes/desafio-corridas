@@ -1,9 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 
+const Address = z
+  .string()
+  .trim()
+  .min(3)
+  .max(200)
+  .regex(/[\p{L}\p{N}]/u, 'precisa ter letras ou números');
+
 export const CreateRideSchema = z.object({
-  origin: z.string().trim().min(3).max(200),
-  destination: z.string().trim().min(3).max(200),
+  origin: Address,
+  destination: Address,
 });
 export type CreateRide = z.infer<typeof CreateRideSchema>;
 

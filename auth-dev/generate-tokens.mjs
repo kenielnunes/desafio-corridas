@@ -12,6 +12,8 @@ const PEOPLE = [
   { sub: 'passageiro-1', role: 'passageiro' },
   { sub: 'passageiro-2', role: 'passageiro' },
   { sub: 'passageiro-3', role: 'passageiro' },
+  { sub: 'passageiro-4', role: 'passageiro' },
+  { sub: 'passageiro-5', role: 'passageiro' },
   { sub: 'motorista-1', role: 'motorista' },
   { sub: 'motorista-2', role: 'motorista' },
 ];

@@ -7,11 +7,12 @@ const API = process.env.API_URL ?? 'http://localhost:3000';
 const token = (name: string) =>
   readFileSync(new URL(`../../auth-dev/tokens/${name}.jwt`, import.meta.url), 'utf8').trim();
 
-type Options = { token?: string; body?: unknown; key?: string };
+type Options = { token?: string; authorization?: string; body?: unknown; key?: string };
 
 async function call(method: string, path: string, options: Options = {}) {
   const headers: Record<string, string> = {};
   if (options.token) headers.authorization = `Bearer ${options.token}`;
+  if (options.authorization) headers.authorization = options.authorization;
   if (options.key) headers['idempotency-key'] = options.key;
   if (options.body !== undefined) headers['content-type'] = 'application/json';
   const response = await fetch(`${API}${path}`, {
@@ -74,6 +75,16 @@ describe('autenticação: 401', () => {
   it('token assinado por outra chave', async () => {
     expect((await call('GET', '/corridas', { token: token('other-key') })).status).toBe(401);
   });
+
+  it('texto sobrando depois do token', async () => {
+    const authorization = `Bearer ${token('passageiro-1')} sobra`;
+    expect((await call('GET', '/corridas', { authorization })).status).toBe(401);
+  });
+
+  it('o nome do esquema não diferencia maiúsculas (RFC 9110)', async () => {
+    const authorization = `bearer ${token('passageiro-1')}`;
+    expect((await call('GET', '/corridas', { authorization })).status).toBe(200);
+  });
 });
 
 describe('autorização: 403', () => {
@@ -98,6 +109,46 @@ describe('autorização: 403', () => {
   it('motorista não inicia corrida aceita por outro motorista', async () => {
     expect((await updateStatus('motorista-1', id, 'accepted')).status).toBe(200);
     expect((await updateStatus('motorista-2', id, 'in_progress')).status).toBe(403);
+  });
+});
+
+describe('listagem por perfil', () => {
+  let available: string;
+  let acceptedByOther: string;
+  beforeAll(async () => {
+    available = (await newRide('passageiro-4')).id;
+    acceptedByOther = (await newRide('passageiro-4')).id;
+    await updateStatus('motorista-1', acceptedByOther, 'accepted');
+  });
+
+  const ids = (rides: { id: string }[]) => rides.map((ride) => ride.id);
+
+  it('passageiro vê só as próprias corridas', async () => {
+    const owner = await call('GET', '/corridas', { token: token('passageiro-4') });
+    expect(ids(owner.body)).toEqual(expect.arrayContaining([available, acceptedByOther]));
+    const other = await call('GET', '/corridas', { token: token('passageiro-2') });
+    expect(ids(other.body)).not.toContain(available);
+  });
+
+  it('motorista vê as corridas disponíveis com ?available=true', async () => {
+    const { body } = await call('GET', '/corridas?available=true', {
+      token: token('motorista-2'),
+    });
+    expect(ids(body)).toContain(available);
+    expect(body.every((ride: { status: string }) => ride.status === 'requested')).toBe(true);
+  });
+
+  it('sem filtro, o motorista vê só as corridas dele', async () => {
+    const { body } = await call('GET', '/corridas', { token: token('motorista-2') });
+    expect(ids(body)).not.toContain(acceptedByOther);
+    expect(body.every((ride: { driverId: string }) => ride.driverId === 'motorista-2')).toBe(true);
+  });
+
+  it('motorista não lê corrida aceita por outro motorista', async () => {
+    const response = await call('GET', `/corridas/${acceptedByOther}`, {
+      token: token('motorista-2'),
+    });
+    expect(response.status).toBe(403);
   });
 });
 

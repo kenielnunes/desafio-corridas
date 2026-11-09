@@ -17,3 +17,4 @@ blob-report/
 docker-compose.override.yml
 .claude/settings.local.json
 CLAUDE.local.md
+!auth-dev/public-key.pem

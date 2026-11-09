@@ -8,15 +8,17 @@ A solução mais simples que cumpre o requisito e que o Keniel consiga explicar 
 
 ## Escrita
 
-- Português do Brasil em docs, commits e comentários.
-- Domínio em português (`Corrida`, `passageiro`, `motorista`). Termos técnicos e nomes de métricas em inglês, como manda a convenção do Prometheus.
+- Identificadores em inglês: variáveis, funções, classes, tipos, nomes de arquivos, campos de JSON e de banco, variáveis de ambiente, valores de status, nomes de filas e de métricas.
+- Em português do Brasil: textos da interface, comentários, mensagens de erro e de log, documentação e mensagens de commit.
+- Ficam como o enunciado define, por serem contrato do desafio: as rotas `/corridas`, as routing keys `corrida.criada` e `corrida.status_alterado` e os perfis `passageiro` e `motorista`.
 - Proibido travessão (—), meia risca (–) e hífen com espaços no meio de frase, em código, docs e mensagens de commit. Hífen só dentro de palavras que o têm (e-mail, segunda-feira).
 - Comentário no código só quando um dev sênior não entenderia o porquê daquilo estar ali. Nada que repita o que o código já diz.
 
 ## Commits
 
 - Conventional Commits em pt-BR, por exemplo `feat(api): exige Idempotency-Key no POST /corridas`.
-- Pequenos e frequentes, com o porquê no corpo da mensagem.
+- Pequenos e frequentes, um por implementação, com mensagem direta e objetiva sobre o que o commit faz.
+- Sem mencionar o Claude nem modelos de IA nas mensagens (a declaração de uso de IA fica no README).
 - Sem squash: o histórico faz parte da avaliação.
 - Nunca dar push. O Keniel faz o push manualmente; avise quando houver algo pronto para subir.
 
@@ -39,7 +41,7 @@ A solução mais simples que cumpre o requisito e que o Keniel consiga explicar 
 4. Revisão em paralelo por agentes: código, segurança e QA com Playwright no Chrome do WSL.
 5. Três perguntas no estilo da entrevista.
 6. Review do Keniel.
-7. Merge local em `main` sem squash e aviso para o push.
+7. Aviso para o push.
 
 ## Comandos
 

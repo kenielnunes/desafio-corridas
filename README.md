@@ -96,7 +96,15 @@ aceitar() { curl -s -o /dev/null -w "%{http_code}\n" -X PATCH $API/corridas/$ID/
 aceitar "$M1" & aceitar "$M2"; wait   # um 200 e um 409
 ```
 
-**429: a 11ª criação no mesmo minuto**
+**Listas: o motorista vê as dele por padrão e as disponíveis com `?available=true`**
+
+```bash
+curl -s -H "Authorization: Bearer $P1" $API/corridas                      # corridas do passageiro
+curl -s -H "Authorization: Bearer $M1" "$API/corridas?available=true"    # solicitadas, para aceitar
+curl -s -H "Authorization: Bearer $M1" $API/corridas                      # corridas do motorista
+```
+
+**429: a 11ª requisição de criação no mesmo minuto**
 
 ```bash
 for i in $(seq 1 11); do
@@ -116,7 +124,7 @@ pnpm test                                  # unitários (regras de status e de p
 pnpm --filter @corridas/api test:api       # testes de API, com o compose de pé
 ```
 
-Se a API estiver em outra porta: `API_URL=http://localhost:3100 pnpm --filter @corridas/api test:api`. A suíte respeita o rate limit de 10 criações por minuto por passageiro; rodando mais de 3 vezes no mesmo minuto, ela começa a receber 429.
+Se a API estiver em outra porta: `API_URL=http://localhost:3100 pnpm --filter @corridas/api test:api`. A suíte respeita o rate limit de 10 requisições de criação por minuto por passageiro; rodando mais de 3 vezes no mesmo minuto, ela começa a receber 429.
 
 ## Documentos
 

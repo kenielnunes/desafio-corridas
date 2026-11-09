@@ -25,7 +25,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 **Rate limit.**
 
 - **Biblioteca:** `@nestjs/throttler`.
-- **Chave do contador:** usuário do token e rota. Cada usuário pode fazer até 120 requisições por minuto em cada rota e até 10 criações de corrida por minuto. Acima disso, a API responde 429 com `Retry-After`.
+- **Chave do contador:** usuário do token e rota. Cada usuário pode fazer até 120 requisições por minuto em cada rota e até 10 requisições de criação de corrida por minuto. Reenvios idempotentes também contam. Acima disso, a API responde 429 com `Retry-After`.
 - **Por usuário e não por IP:** atrás do proxy da UI, todos chegariam com o mesmo IP.
 - **Depois da autenticação:** requisição sem token já para no 401, com custo desprezível. Proteção contra enxurrada sem token é papel da borda (proxy, ingress, WAF).
 - **Trade-off:** o contador fica em memória, então cada réplica da API conta separado.
@@ -50,10 +50,12 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 
 **Por quê.** Checar e depois gravar na aplicação deixa uma janela entre a checagem e a gravação, e duas requisições simultâneas passam juntas por ela. O banco é o único ponto que enxerga as duas ao mesmo tempo, e tanto o índice único quanto o UPDATE condicional são atômicos. Uma trava no Redis não seria atômica junto com o INSERT no MySQL.
 
+**Detalhe que a revisão pegou.** A collation padrão do MySQL compara texto ignorando maiúsculas, acentos e espaço no fim. Para as regras do banco valerem, `passenger_id`, `driver_id` e `idempotency_key` usam comparação binária (`utf8mb4_bin`); senão `Ana` seria dona das corridas de `ana`.
+
 **Trade-off.** A mesma chave enviada com um corpo diferente devolve a corrida original em vez de um erro (ver LIMITES).
 
 ## Interpretações de pontos ambíguos
 
-- **`GET /corridas` (lista):** não está no enunciado, mas a tela precisa listar e o motorista precisa achar o que aceitar. Li "motorista só altera status" como "das escritas, o motorista só altera status": ele lê as corridas disponíveis e as que aceitou.
+- **`GET /corridas` (lista):** não está no enunciado, mas a tela precisa listar e o motorista precisa achar o que aceitar. Li "motorista só altera status" como "das escritas, o motorista só altera status". O passageiro lista as próprias corridas. O motorista lista as dele por padrão e as solicitadas com `?available=true`. A primeira versão misturava as duas numa lista só, cortada em 50, e as corridas do motorista sumiam quando havia muitas solicitadas mais novas; o QA pegou.
 - **403 em vez de 404:** corrida de outro passageiro responde 403. O enunciado pede para demonstrar o 403, e os IDs são UUID, difíceis de adivinhar. Em produção eu avaliaria responder 404, para não confirmar que o ID existe.
 - **Finalizar corrida sem motorista:** responde 409, porque é o estado que não permite a mudança. O 403 fica para quando a corrida é de outro motorista.

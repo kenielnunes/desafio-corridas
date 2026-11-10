@@ -4,13 +4,21 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/main.js",
+    "start": "node --import ./dist/instrumentation.js dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run src",
     "test:integration": "vitest run test"
   },
   "dependencies": {
+    "@opentelemetry/core": "3.0.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.300.0",
+    "@opentelemetry/instrumentation-amqplib": "0.71.0",
+    "@opentelemetry/instrumentation-ioredis": "0.72.0",
+    "@opentelemetry/instrumentation-mongodb": "0.77.0",
+    "@opentelemetry/instrumentation-pino": "0.70.0",
+    "@opentelemetry/sdk-node": "0.300.0",
     "amqplib": "2.3.0",
+    "import-in-the-middle": "3.5.3",
     "ioredis": "6.0.0",
     "mongodb": "7.8.0",
     "pino": "10.4.0",

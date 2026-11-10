@@ -17,4 +17,4 @@ COPY --from=build /repo/worker/dist worker/dist
 USER node
 WORKDIR /repo/worker
 EXPOSE 9464
-CMD ["node", "dist/main.js"]
+CMD ["node", "--import", "./dist/instrumentation.js", "dist/main.js"]

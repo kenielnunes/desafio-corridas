@@ -19,4 +19,4 @@ COPY --from=build /repo/api/dist api/dist
 USER node
 WORKDIR /repo/api
 EXPOSE 3000
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && exec node dist/main.js"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && exec node --import ./dist/instrumentation.js dist/main.js"]

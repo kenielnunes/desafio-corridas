@@ -9,3 +9,5 @@ minimumReleaseAge: 1440
 allowBuilds:
   '@prisma/engines': true
   prisma: true
+  # o postinstall só confere versões e imprime avisos; a biblioteca funciona sem ele
+  protobufjs: false

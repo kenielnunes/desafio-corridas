@@ -25,6 +25,15 @@
 
 CPU em núcleos. Os p95 são do k6; pico de req/s, CPU, fila e atraso são do Prometheus.
 
+Recursos no pico de cada rodada, pelas métricas de processo do prom-client (`process_cpu_seconds_total` e `process_resident_memory_bytes`):
+
+| Rodada                     | CPU da API | Memória da API | CPU do worker | Memória do worker |
+| -------------------------- | ---------- | -------------- | ------------- | ----------------- |
+| 20 corridas/s              | 0,45       | 417 MB         | 0,13          | 229 MB            |
+| 60 corridas/s              | 0,91       | 416 MB         | 0,22          | 236 MB            |
+| 100 corridas/s, pool de 10 | 1,12       | 512 MB         | 0,27          | 232 MB            |
+| 100 corridas/s, pool de 30 | 1,18       | 539 MB         | 0,24          | 239 MB            |
+
 ## O que descobri
 
 1. **Até 60 corridas por segundo, sobra.** São 540 requisições por segundo, nenhum erro, escrita com p95 de 22 ms e fila sempre vazia.
@@ -49,9 +58,11 @@ Com a stack de pé:
 ```bash
 RATE_LIMIT_REQUESTS_PER_MINUTE=1000000 RATE_LIMIT_CREATES_PER_MINUTE=1000000 docker compose up -d --wait api
 docker compose run --rm k6                              # 20 corridas por segundo
+RIDES_PER_SECOND=60 docker compose run --rm k6
 RIDES_PER_SECOND=100 docker compose run --rm k6         # rodada de saturação
 DATABASE_POOL_SIZE=30 RATE_LIMIT_REQUESTS_PER_MINUTE=1000000 RATE_LIMIT_CREATES_PER_MINUTE=1000000 \
   docker compose up -d --wait api                       # pool de 30 conexões
+RIDES_PER_SECOND=100 docker compose run --rm k6         # saturação de novo, com o pool maior
 docker compose up -d --wait api                         # volta à configuração normal
 ```
 

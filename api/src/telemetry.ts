@@ -24,7 +24,8 @@ export function startTelemetry() {
         ignoreLayersType: [ExpressLayerType.MIDDLEWARE, ExpressLayerType.REQUEST_HANDLER],
       }),
       new PrismaInstrumentation(),
-      new IORedisInstrumentation(),
+      // Só o nome do comando, como no worker: o valor gravado no cache é a corrida inteira.
+      new IORedisInstrumentation({ dbStatementSerializer: (command) => command }),
       new AmqplibInstrumentation(),
       new PinoInstrumentation(),
     ],

@@ -13,7 +13,8 @@ export function startTelemetry() {
     instrumentations: [
       new AmqplibInstrumentation(),
       new MongoDBInstrumentation(),
-      new IORedisInstrumentation(),
+      // Só o nome do comando: os argumentos do EVAL levariam a corrida inteira ao Jaeger.
+      new IORedisInstrumentation({ dbStatementSerializer: (command) => command }),
       new PinoInstrumentation(),
     ],
   }).start();

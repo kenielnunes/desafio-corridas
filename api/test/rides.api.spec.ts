@@ -270,4 +270,23 @@ describe('observabilidade', () => {
     });
     expect(replaced.headers.get('x-correlation-id')).toMatch(UUID);
   });
+
+  it('/metrics responde sem token e conta as respostas pela rota, sem o id no rótulo', async () => {
+    const missing = randomUUID();
+    await call('GET', `/corridas/${missing}`, { token: token('passageiro-1') });
+    await call('GET', '/corridas');
+
+    const response = await fetch(`${API}/metrics`);
+    const text = await response.text();
+    const requests = text.split('\n').filter((line) => line.startsWith('http_requests_total{'));
+    const counted = (route: string, status: number) =>
+      requests.some(
+        (line) => line.includes(`route="${route}"`) && line.includes(`status_code="${status}"`),
+      );
+
+    expect(response.status).toBe(200);
+    expect(counted('/corridas/:id', 404)).toBe(true);
+    expect(counted('/corridas', 401)).toBe(true);
+    expect(text).not.toContain(missing);
+  });
 });

@@ -10,6 +10,7 @@ import { config } from './config.js';
 import { EventPublisher } from './events/publisher.js';
 import { HealthController } from './health.controller.js';
 import { correlationIdFor } from './observability/correlation.js';
+import { MetricsController } from './observability/metrics.controller.js';
 import { PrismaService } from './prisma.service.js';
 import { RideCache } from './rides/cache.js';
 import { RidesController } from './rides/rides.controller.js';
@@ -37,7 +38,7 @@ import { RidesService } from './rides/rides.service.js';
       errorMessage: 'muitas requisições; tente de novo em instantes',
     }),
   ],
-  controllers: [RidesController, HealthController],
+  controllers: [RidesController, HealthController, MetricsController],
   providers: [
     PrismaService,
     RidesService,

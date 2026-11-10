@@ -84,3 +84,15 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
 - O bloqueio de `/api/metrics` no nginx virou lista de permissão: só `/api/corridas` passa pelo proxy, e o resto de `/api` responde 404. Uma rota interna nova não fica pública por esquecimento.
 - O worker aceitava qualquer texto na propriedade `correlationId` da mensagem; agora aceita só UUID, como a API.
 - O roteiro de mensagem duplicada do README usava datas fixas, e o worker registrava um atraso de 30 horas na métrica. As datas agora são geradas na hora.
+
+## 2026-11-10 (Fase 6: trace distribuído e teste de carga)
+
+- OpenTelemetry no padrão que eu já usava em outro projeto: `node --import` carrega a instrumentação antes da aplicação, e o hook síncrono do `import-in-the-middle` fica só para os pacotes importados por ESM. O Nest 12 é ESM e importa o Express por `import`, então o Express entrou na lista; o pino, carregado por `require` dentro do nestjs-pino, não precisou.
+- Antes de instalar, conferi a faixa de versões de cada instrumentação: amqplib 2, Express 5, ioredis 6 e mongodb 7 estão dentro; o Nest 12, não (vai até a 11). Escolhi versões publicadas havia pelo menos uma semana.
+- O pnpm recusou a instalação por causa do postinstall do protobufjs, que veio com o SDK. O script só confere versões, então marquei como não permitido no `allowBuilds`.
+- Testei a API instrumentada num container à parte, na porta 3200 e com um Jaeger próprio, enquanto os revisores usavam o ambiente. A instrumentação do Express gerava um span por middleware (parsers, pino, métricas); configurei para ela só dar nome à rota no span HTTP.
+- A API de consulta antiga do Jaeger (`/api/traces`) não existe na 2.22; usei a `/api/v3`.
+- O trace de ponta a ponta funcionou de primeira: o `traceparent` vai no header da mensagem, e o log do worker sai com o mesmo `trace_id` da requisição na API.
+- Primeira rodada do k6 inválida: 94% das criações deram 429, com exatamente 210 sucessos (7 passageiros × 10 por minuto × 3 minutos). O `depends_on` do serviço k6 fez o `docker compose run` recriar a API com o rate limit padrão, desfazendo o limite alto que eu tinha acabado de subir. Tirei o `depends_on`.
+- A 100 corridas por segundo, a escrita passou de 1 s. O trace de um PATCH lento mostrou 1,43 s de 1,5 s esperando em `start_transaction`, isto é, uma conexão do pool de 10. Deixei o pool configurável (`DATABASE_POOL_SIZE`) e confirmei a hipótese com 30 conexões: 18% a mais de throughput, e o limite passou a ser a CPU da API.
+- Mantive o limiar do alerta da fila em 100: a fila ficou em zero em todas as rodadas, mesmo com a API saturada.

@@ -11,7 +11,9 @@ import { declareTopology, QUEUE } from './topology.js';
 const log = pino({ base: { service: 'worker' } });
 
 const history = await RideHistory.connect(config.mongoUrl);
-const cache = RideCache.connect(config.redisUrl, config.cacheTtlSeconds);
+const cache = RideCache.connect(config.redisUrl, config.cacheTtlSeconds, (reason) =>
+  log.warn({ reason }, 'falha na conexão com o Redis'),
+);
 const connection = await amqp.connect(config.rabbitmqUrl);
 const channel = await connection.createChannel();
 await declareTopology(channel);
@@ -28,8 +30,17 @@ connection.on('close', () => {
 let inFlight = 0;
 let ready = false;
 
+// Só a mensagem do erro: o erro completo do Redis traz os argumentos do comando, isto é, a
+// corrida inteira com dados do passageiro.
+function summarize(error: unknown) {
+  return error instanceof Error ? error.message.split('\n')[0] : String(error);
+}
+
 async function handle(message: ConsumeMessage | null) {
-  if (!message) return;
+  if (!message) {
+    log.error('o RabbitMQ cancelou o consumo; encerrando para o Docker reiniciar');
+    process.exit(1);
+  }
   inFlight++;
   try {
     const { result, event, error } = await processMessage(message.content, {
@@ -42,12 +53,13 @@ async function handle(message: ConsumeMessage | null) {
 
     const context = {
       result,
+      messageId: message.properties.messageId,
       type: event?.type,
       eventId: event?.eventId,
       rideId: event?.ride.id,
     };
     if (result === 'failed') {
-      log.warn({ ...context, err: error }, 'falhou; o RabbitMQ vai reentregar');
+      log.warn({ ...context, reason: summarize(error) }, 'falhou; o RabbitMQ vai reentregar');
     } else if (result === 'invalid') {
       log.warn(context, 'mensagem inválida enviada para a DLQ');
     } else {

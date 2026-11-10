@@ -139,7 +139,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 - **Latência p95 da API.** Bom candidato a terceiro alerta; entre os dois, preferi o erro, que é o sintoma mais direto.
 - **Falha ao publicar evento (`events_published_total{result="failed"}`).** Também seria um bom terceiro: é o único sinal de evento perdido, já que a API não devolve erro nesse caso.
 
-**Trade-off.** Com pouco tráfego, um erro isolado já passa de 5% (1 erro em 10 requisições) e pode disparar o alerta; com mais tempo, eu exigiria um volume mínimo de requisições na regra. Os alertas também não notificam ninguém: sem Alertmanager, como o enunciado permite, o estado aparece em http://localhost:9090/alerts.
+**Trade-off.** Com pouco tráfego, um erro isolado já passa de 5% (1 erro em 10 requisições) e pode disparar o alerta; com mais tempo, eu exigiria um volume mínimo de requisições na regra. Os dois alertas dependem da coleta: com a API fora do ar, as séries somem e o alerta de erro não dispara (um alerta de `up == 0` cobriria esse caso). Eles também não notificam ninguém: sem Alertmanager, como o enunciado permite, o estado aparece em http://localhost:9090/alerts.
 
 ## Notas sobre a interface
 

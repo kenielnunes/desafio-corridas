@@ -32,8 +32,13 @@ O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram ab
 
 - **Alertas sem notificação.** Não há Alertmanager; os alertas só aparecem na tela do Prometheus.
 - **Regras sem teste automatizado.** O CI valida a sintaxe com o `promtool` e confere que os dois arquivos de alerta são iguais, mas não testa se cada regra dispara no cenário certo. O `promtool test rules` faz isso com séries simuladas.
-- **`/metrics` sem autenticação.** Só a rede interna do compose chega nele; o nginx da interface bloqueia `/api/metrics` para não expô-lo pelo proxy público. Em produção, uma NetworkPolicy no cluster ou autenticação no scrape.
+- **`/metrics` sem autenticação.** Chegam nele a rede do compose e o próprio host, porque as portas são publicadas em `127.0.0.1`. O proxy da interface só repassa `/api/corridas`. Em produção, uma NetworkPolicy no cluster ou autenticação no scrape.
 - **Logs só na saída do container.** Não há agregador (Loki, Elasticsearch); a busca pelo correlation id é com `docker compose logs`.
+- **Logs sem rotação e sem limite antes da autenticação.** Cada requisição gera uma linha, inclusive as sem token, e o Docker guarda os logs sem limite de tamanho. Em produção, rotação no coletor e rate limit por IP no ingress, antes da autenticação.
+- **Requisição recusada pelo parser de JSON fica fora do log.** Ela devolve o `X-Correlation-Id` e entra na métrica (rota `unmatched`), mas o parser roda antes do pino-http e não gera linha de log.
+- **Subida da API com texto fora do JSON.** O `prisma migrate deploy` roda no mesmo container, antes da API, e escreve texto. Com a migração separada do start, o container da API escreveria só JSON.
+- **Alertas dependem da coleta.** Se o Prometheus deixar de coletar a API ou o RabbitMQ, as séries somem e nenhum dos dois alertas dispara. Em produção, um alerta de `up == 0` cobre o alvo fora do ar.
+- **Rótulo `service` no cluster.** O PrometheusRule filtra por `service="corridas-api"`, que vem do prom-client. Com um ServiceMonitor do Prometheus Operator, o rótulo `service` recebe o nome do Service do Kubernetes: o Service precisa se chamar `corridas-api`, ou o ServiceMonitor precisa de `honorLabels: true`.
 - **Atraso medido entre dois relógios.** O `worker_event_lag_seconds` compara o horário do evento, gerado na API, com o do worker. No compose é o mesmo host; em produção, depende de os relógios estarem sincronizados (NTP).
 
 ## Interface

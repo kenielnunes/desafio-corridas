@@ -68,7 +68,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 
 **Por quê.** Publicar antes cria evento fantasma se o INSERT falhar. O Outbox é a forma correta de não perder evento, mas exige tabela, processo de publicação e cuidados de concorrência; preferi entregar algo que sei explicar inteiro. Publicar depois funciona sempre que o RabbitMQ está de pé.
 
-**Trade-off.** Se o RabbitMQ cair entre o commit e a publicação, o evento se perde. A corrida continua no MySQL e a API segue lendo dela (o cache cai para o MySQL), mas o histórico no MongoDB fica sem esse evento. A falha aparece no log da API. Com mais tempo, eu faria o Outbox.
+**Trade-off.** Se o RabbitMQ cair entre o commit e a publicação, o evento se perde. A corrida continua no MySQL e a API segue lendo dela (o cache cai para o MySQL), mas o histórico no MongoDB fica sem esse evento. A falha aparece no log da API e na métrica `events_published_total{result="failed"}`. Com mais tempo, eu faria o Outbox.
 
 ## 4. Topologia do RabbitMQ
 
@@ -118,6 +118,28 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 - **Corridas no MySQL, a fonte da verdade:** é um dado relacional e transacional, que precisa de índice único (idempotência) e de update condicional (aceite concorrente).
 - **Histórico no MongoDB:** é append-only, com um documento por evento e o retrato da corrida naquele momento. É consultado por corrida (índice em `rideId` e `version`), e o formato do evento pode evoluir sem migração.
 - **Trade-off:** dois bancos para operar.
+
+## 7. Os dois alertas
+
+**Contexto.** O enunciado pede dois alertas, com a justificativa da escolha e dos limiares.
+
+**Escolha.**
+
+- **`RidesApiHighErrorRate`: mais de 5% das respostas da API com erro 5xx, por 5 minutos seguidos.** É o sintoma que o passageiro e o motorista sentem: o pedido não é criado, o aceite falha. MySQL fora ou um bug terminam em 5xx; RabbitMQ e Redis fora, não, porque a API segue sem eles (entradas 3 e 5). Os 4xx ficam de fora, porque são erros de quem chamou: token vencido, transição inválida, 429 do rate limit.
+- **`RidesWorkerQueueBacklog`: mais de 100 mensagens esperando na fila do worker, por 5 minutos seguidos.** Pega o worker parado ou lento, um problema que a API não mostra: o histórico de auditoria atrasa e o worker deixa de aquecer o cache. Se a fila continuar crescendo, o RabbitMQ chega ao limite de memória ou de disco e bloqueia quem publica. Aí cada escrita da API espera os 2 segundos do prazo e o evento se perde, porque não há Outbox (entrada 3).
+
+**Por que esses limiares.**
+
+- **5% de erros:** em operação normal, a taxa de 5xx é zero; uma requisição falhando em cada 20 já é incidente, não ruído. Os 5 minutos seguidos evitam alertar por um pico curto, como o reinício de um container.
+- **100 mensagens:** limiar provisório. O valor certo depende da vazão do worker, que o teste de carga (k6) vai medir. A ideia é alertar quando a fila tiver mais trabalho do que o worker esvazia em poucos segundos e continuar assim por 5 minutos; uma rajada que esvazia sozinha não deve alertar.
+
+**Alternativas.**
+
+- **Alertar pelo atraso (`worker_event_lag_seconds`) em vez do tamanho da fila.** O atraso é o mais próximo do impacto, mas só é medido quando o worker processa algo: com o worker parado, a métrica fica sem dados e o alerta não dispara. A fila cresce de qualquer jeito.
+- **Latência p95 da API.** Bom candidato a terceiro alerta; entre os dois, preferi o erro, que é o sintoma mais direto.
+- **Falha ao publicar evento (`events_published_total{result="failed"}`).** Também seria um bom terceiro: é o único sinal de evento perdido, já que a API não devolve erro nesse caso.
+
+**Trade-off.** Com pouco tráfego, um erro isolado já passa de 5% (1 erro em 10 requisições) e pode disparar o alerta; com mais tempo, eu exigiria um volume mínimo de requisições na regra. Os alertas também não notificam ninguém: sem Alertmanager, como o enunciado permite, o estado aparece em http://localhost:9090/alerts.
 
 ## Notas sobre a interface
 

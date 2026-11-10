@@ -290,7 +290,7 @@ Se a API estiver em outra porta, passe `API_URL=http://localhost:3100` para as d
 ## Uso de IA
 
 - **Ferramenta:** Claude Code (Claude, da Anthropic), no terminal.
-- **Para quê:** planejar as fases e me explicar cada conceito antes de implementar (RabbitMQ, Prometheus, Redis, OpenTelemetry); escrever código, testes e documentação comigo; revisar código, segurança e QA com agentes, incluindo testes com Playwright no Chrome; investigar problemas, como o gargalo do pool de conexões no teste de carga.
+- **Para quê:** planejar as fases e me explicar cada conceito antes de implementar (RabbitMQ, Prometheus, Redis, OpenTelemetry); escrever código, testes e documentação com agentes; revisar código, segurança e QA comigo, testes com Playwright no Chrome; investigar problemas, como o gargalo do pool de conexões no teste de carga com agentes.
 - **Como validei:** cada fase passou pelas suítes automatizadas e pelos roteiros manuais deste README. As decisões, com as alternativas descartadas, estão no [DECISIONS.md](DECISIONS.md), e o que deu errado no caminho, no [DIARIO.md](DIARIO.md).
 - **Uma sugestão que rejeitei:** o primeiro plano proposto tinha, entre outras peças, Transactional Outbox com um processo próprio de publicação, JWKS e Kubernetes com KEDA. Rejeitei porque eram peças demais para eu explicar e defender, e o enunciado diz que entregar o que não se sabe explicar pesa mais do que entregar incompleto. Pedi a versão mais simples que cumprisse cada requisito: chave pública no lugar do JWKS, evento publicado depois do commit (o risco de perder evento está no DECISIONS, com o Outbox como o que eu faria com mais tempo) e testes contra o próprio compose.
 

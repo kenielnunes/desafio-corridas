@@ -31,6 +31,24 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
+  observabilidade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: promtool valida a configuração e as regras de alerta
+        run: >-
+          docker run --rm --entrypoint promtool
+          -v "$PWD/observability:/etc/prometheus:ro"
+          prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
+      - name: alerts.yml e o PrometheusRule têm os mesmos groups
+        run: >-
+          diff
+          <(yq -o=json '.groups' observability/alerts.yml)
+          <(yq -o=json '.spec.groups' observability/alerts-prometheusrule.yaml)
+
   integracao:
     runs-on: ubuntu-latest
     timeout-minutes: 30

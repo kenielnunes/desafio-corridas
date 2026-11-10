@@ -78,6 +78,8 @@ services:
       JWT_PUBLIC_KEY_FILE: /run/jwt/public-key.pem
       JWT_ISSUER: corridas-auth-dev
       JWT_AUDIENCE: corridas-api
+      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-120}
+      RATE_LIMIT_CREATES_PER_MINUTE: ${RATE_LIMIT_CREATES_PER_MINUTE:-10}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       OTEL_SERVICE_NAME: corridas-api
       OTEL_METRICS_EXPORTER: none
@@ -168,6 +170,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # Só sobe com o profile: docker compose run --rm k6 (ver loadtest/REPORT.md).
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: [loadtest]
+    command: ['run', '/scripts/rides.js']
+    environment:
+      API_URL: http://api:3000
+      RIDES_PER_SECOND: ${RIDES_PER_SECOND:-20}
+    volumes:
+      - ./loadtest:/scripts:ro
+      - ./auth-dev/tokens:/tokens:ro
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   mysql-data:

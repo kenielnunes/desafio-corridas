@@ -15,10 +15,18 @@ export function StatusBadge({ status }: { status: RideStatus }) {
   );
 }
 
-export function ErrorMessage({ message, testId }: { message?: string; testId?: string }) {
+export function ErrorMessage({
+  message,
+  testId,
+  sticky = false,
+}: {
+  message?: string;
+  testId?: string;
+  sticky?: boolean;
+}) {
   if (!message) return null;
   return (
-    <p role="alert" className="error" data-testid={testId}>
+    <p role="alert" className={sticky ? 'error sticky' : 'error'} data-testid={testId}>
       {message}
     </p>
   );

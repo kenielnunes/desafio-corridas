@@ -3,7 +3,13 @@ import { api, ApiError } from './api';
 import { ErrorMessage } from './components';
 import { parseToken, type Session } from './session';
 
-export function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }) {
+export function LoginScreen({
+  onLogin,
+  notice,
+}: {
+  onLogin: (session: Session) => void;
+  notice?: string;
+}) {
   const [token, setToken] = useState('');
   const [error, setError] = useState<string>();
   const [loggingIn, setLoggingIn] = useState(false);
@@ -21,8 +27,11 @@ export function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }
       await api.list(session.token);
       onLogin(session);
     } catch (failure) {
-      const invalid = failure instanceof ApiError && failure.status === 401;
-      setError(invalid ? 'Token inválido ou expirado.' : String(failure));
+      if (failure instanceof ApiError && failure.status === 401) {
+        setError('Token inválido ou expirado.');
+      } else {
+        setError(failure instanceof Error ? failure.message : String(failure));
+      }
     } finally {
       setLoggingIn(false);
     }
@@ -32,11 +41,15 @@ export function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }
     <main className="narrow">
       <form className="card" onSubmit={login}>
         <h1>Corridas</h1>
+        {notice && <p className="hint">{notice}</p>}
         <label>
           Token JWT
           <textarea
             data-testid="token-input"
             rows={6}
+            spellCheck={false}
+            autoComplete="off"
+            autoCapitalize="off"
             value={token}
             onChange={(event) => setToken(event.target.value)}
           />
@@ -45,7 +58,7 @@ export function LoginScreen({ onLogin }: { onLogin: (session: Session) => void }
           Tokens de teste em <code>auth-dev/tokens/</code>.
         </p>
         <ErrorMessage message={error} testId="login-error" />
-        <button disabled={loggingIn} data-testid="login-button">
+        <button disabled={loggingIn || !token.trim()} data-testid="login-button">
           Entrar
         </button>
       </form>

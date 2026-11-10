@@ -1,5 +1,5 @@
-import { type FormEvent, useState } from 'react';
-import { api, type Ride } from './api';
+import { type FormEvent, useRef, useState } from 'react';
+import { api, newIdempotencyKey, type Ride } from './api';
 import { ErrorMessage, StatusBadge } from './components';
 import { usePolling } from './usePolling';
 
@@ -16,7 +16,7 @@ export function PassengerScreen({ token }: { token: string }) {
           setSelectedId(ride.id);
         }}
       />
-      {selectedId && <Tracking token={token} id={selectedId} />}
+      {selectedId && <Tracking key={selectedId} token={token} id={selectedId} />}
       <section className="card">
         <h2>Minhas corridas</h2>
         <ErrorMessage message={rides.error} />
@@ -38,19 +38,27 @@ export function PassengerScreen({ token }: { token: string }) {
 function NewRide({ token, onCreated }: { token: string; onCreated: (ride: Ride) => void }) {
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
-  // A chave nasce com o formulário e só muda depois de uma criação bem-sucedida: reenviar após
-  // um erro de rede reaproveita a mesma chave, e a API devolve a corrida em vez de criar outra.
-  const [key, setKey] = useState(() => crypto.randomUUID());
   const [error, setError] = useState<string>();
   const [sending, setSending] = useState(false);
+  // A chave representa a intenção: reenviar o mesmo pedido depois de um erro de rede reaproveita a
+  // chave, e a API devolve a corrida já criada; mudar origem ou destino é outro pedido, com chave nova.
+  const lastAttempt = useRef<{ key: string; content: string } | null>(null);
+
+  function keyFor(content: string) {
+    if (lastAttempt.current?.content !== content) {
+      lastAttempt.current = { key: newIdempotencyKey(), content };
+    }
+    return lastAttempt.current.key;
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const data = { origin: origin.trim(), destination: destination.trim() };
     setSending(true);
     setError(undefined);
     try {
-      const ride = await api.create(token, key, { origin, destination });
-      setKey(crypto.randomUUID());
+      const ride = await api.create(token, keyFor(`${data.origin}\n${data.destination}`), data);
+      lastAttempt.current = null;
       setOrigin('');
       setDestination('');
       onCreated(ride);
@@ -77,7 +85,10 @@ function NewRide({ token, onCreated }: { token: string; onCreated: (ride: Ride) 
         />
       </label>
       <ErrorMessage message={error} testId="request-error" />
-      <button disabled={sending} data-testid="request-ride">
+      <button
+        disabled={sending || !origin.trim() || !destination.trim()}
+        data-testid="request-ride"
+      >
         Solicitar
       </button>
     </form>

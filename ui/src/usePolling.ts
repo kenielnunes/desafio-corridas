@@ -6,16 +6,23 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs: number, key
 
   useEffect(() => {
     let active = true;
-    const update = () =>
-      fetcher().then(
-        (data) => active && setState({ data }),
-        (error: Error) => active && setState((previous) => ({ ...previous, error: error.message })),
-      );
-    void update();
-    const timer = setInterval(update, intervalMs);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // A próxima leitura só é agendada quando a atual termina: nunca há duas em andamento, então
+    // uma resposta lenta não chega depois de uma mais nova e não faz o status voltar na tela.
+    const run = async () => {
+      try {
+        const data = await fetcher();
+        if (active) setState({ data });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (active) setState((previous) => ({ ...previous, error: message }));
+      }
+      if (active) timer = setTimeout(run, intervalMs);
+    };
+    void run();
     return () => {
       active = false;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
     // fetcher fica fora das dependências de propósito: muda a cada render, e quem diz quando
     // reiniciar a busca é a chave (token, id) ou um reload() explícito.

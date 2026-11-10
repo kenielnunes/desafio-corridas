@@ -21,33 +21,59 @@ export class ApiError extends Error {
   }
 }
 
+let onUnauthorized: () => void = () => undefined;
+
+export function handleUnauthorized(callback: () => void) {
+  onUnauthorized = callback;
+}
+
+// crypto.randomUUID só existe em contexto seguro (HTTPS ou localhost); getRandomValues existe sempre.
+export function newIdempotencyKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 async function request<T>(
   token: string,
   path: string,
   options: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
 ) {
-  const response = await fetch(`/api${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      authorization: `Bearer ${token}`,
-      ...(options.body === undefined ? {} : { 'content-type': 'application/json' }),
-      ...options.headers,
-    },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method: options.method ?? 'GET',
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(options.body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...options.headers,
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+  } catch {
+    throw new ApiError(0, 'Sem conexão com o servidor. Tente de novo.');
+  }
   const body = await response.json().catch(() => null);
+  if (response.status === 401) onUnauthorized();
   if (!response.ok) throw new ApiError(response.status, errorMessage(response.status, body));
   return { body: body as T, headers: response.headers };
 }
 
 function errorMessage(status: number, body: unknown) {
+  if (status === 401) return 'Sessão inválida ou expirada. Entre de novo.';
+  if (status === 429) return 'Muitas tentativas seguidas. Aguarde alguns segundos.';
   const message = (body as { message?: string | string[] } | null)?.message;
-  return `${status}: ${Array.isArray(message) ? message.join('; ') : (message ?? 'erro inesperado')}`;
+  const text = Array.isArray(message) ? message.join('; ') : message;
+  return text ? `${text} (${status})` : `Erro inesperado (${status}).`;
 }
 
 export const api = {
-  list: async (token: string, available = false) =>
-    (await request<Ride[]>(token, available ? '/corridas?available=true' : '/corridas')).body,
+  list: async (token: string, filter: { available?: boolean; active?: boolean } = {}) => {
+    const query = new URLSearchParams();
+    if (filter.available) query.set('available', 'true');
+    if (filter.active) query.set('active', 'true');
+    const suffix = query.size > 0 ? `?${query}` : '';
+    return (await request<Ride[]>(token, `/corridas${suffix}`)).body;
+  },
 
   get: async (token: string, id: string) => {
     const { body, headers } = await request<Ride>(token, `/corridas/${id}`);

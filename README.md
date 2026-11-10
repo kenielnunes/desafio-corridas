@@ -2,7 +2,20 @@
 
 Serviço do desafio técnico da IPLANRIO: o passageiro solicita uma corrida, o motorista aceita, e o status é acompanhado quase em tempo real.
 
-> Em construção. Este README ganha os comandos de validação a cada fase.
+```
+[UI React] ──HTTP+JWT──▶ [API NestJS] ──▶ MySQL (corridas: fonte da verdade)
+                              │
+                              └─ publica evento ──▶ [RabbitMQ] ──▶ [Worker Node] ──▶ Redis (cache de status)
+                                                                                 └─▶ MongoDB (histórico)
+```
+
+## Escopo e priorização
+
+- **Parte 1, fundação:** completa.
+- **Parte 2, operar:** completa. Logs em JSON com `correlation_id` e `trace_id`, métricas na API e no worker, trace da API até o worker no Jaeger, os dois alertas (`alerts.yml` e PrometheusRule) e teste de carga com relatório.
+- **Parte 3, Kubernetes:** não fiz. O [LIMITES.md](LIMITES.md) descreve como eu faria, com os valores de CPU e memória medidos no teste de carga.
+
+Por que essa ordem: o enunciado diz que uma Parte 1 sólida vale mais do que as três partes superficiais, e que a Parte 2 tem peso alto. RabbitMQ, Prometheus e OpenTelemetry eram ferramentas que eu precisava aprender a ponto de explicar cada linha; no tempo sugerido, o Kubernetes ficaria superficial.
 
 ## Como subir
 
@@ -278,3 +291,4 @@ Se a API estiver em outra porta, passe `API_URL=http://localhost:3100` para as d
 - [DECISIONS.md](DECISIONS.md): decisões, alternativas e trade-offs.
 - [LIMITES.md](LIMITES.md): o que ficou de fora e os riscos conhecidos.
 - [DIARIO.md](DIARIO.md): diário de bordo do desenvolvimento.
+- [loadtest/REPORT.md](loadtest/REPORT.md): relatório do teste de carga.

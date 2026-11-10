@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { setTimeout as sleep } from 'node:timers/promises';
 
 const API = process.env.API_URL ?? 'http://localhost:3000';
 
@@ -40,14 +39,6 @@ async function newRide(person: string) {
   const response = await createRide(person);
   expect(response.status, `criar corrida para o teste (429 = rate limit de ${person})`).toBe(201);
   return response.body as { id: string };
-}
-
-async function waitFor<T>(get: () => Promise<T | undefined>, timeoutMs = 10_000) {
-  for (const limit = Date.now() + timeoutMs; Date.now() < limit; await sleep(100)) {
-    const value = await get();
-    if (value) return value;
-  }
-  throw new Error(`condição não atingida em ${timeoutMs} ms`);
 }
 
 const updateStatus = (person: string, id: string, status: string) =>
@@ -244,16 +235,14 @@ describe('rate limit', () => {
 });
 
 describe('cache de leitura', () => {
-  it('depois que o worker processa o evento, a leitura vem do cache com o status novo', async () => {
+  it('depois de mudar o status, a leitura mostra o status novo e a seguinte vem do cache', async () => {
     const { id } = await newRide('passageiro-1');
     await updateStatus('motorista-1', id, 'accepted');
 
-    const read = await waitFor(async () => {
-      const response = await call('GET', `/corridas/${id}`, { token: token('passageiro-1') });
-      return response.headers.get('x-cache') === 'HIT' && response.body.status === 'accepted'
-        ? response
-        : undefined;
-    });
-    expect(read.body.version).toBe(2);
+    const read = () => call('GET', `/corridas/${id}`, { token: token('passageiro-1') });
+    expect((await read()).body).toMatchObject({ status: 'accepted', version: 2 });
+    const second = await read();
+    expect(second.headers.get('x-cache')).toBe('HIT');
+    expect(second.body).toMatchObject({ status: 'accepted', version: 2 });
   });
 });

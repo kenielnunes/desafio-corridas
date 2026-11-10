@@ -18,4 +18,10 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  {
+    files: ['loadtest/**/*.js'],
+    languageOptions: {
+      globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly', open: 'readonly' },
+    },
+  },
 ]);

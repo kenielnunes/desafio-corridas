@@ -39,6 +39,10 @@ O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram ab
 - **Subida da API com texto fora do JSON.** O `prisma migrate deploy` roda no mesmo container, antes da API, e escreve texto. Com a migração separada do start, o container da API escreveria só JSON.
 - **Alertas dependem da coleta.** Se o Prometheus deixar de coletar a API ou o RabbitMQ, as séries somem e nenhum dos dois alertas dispara. Em produção, um alerta de `up == 0` cobre o alvo fora do ar.
 - **Rótulo `service` no cluster.** O PrometheusRule filtra por `service="corridas-api"`, que vem do prom-client. Com um ServiceMonitor do Prometheus Operator, o rótulo `service` recebe o nome do Service do Kubernetes: o Service precisa se chamar `corridas-api`, ou o ServiceMonitor precisa de `honorLabels: true`.
+- **Sem spans do NestJS.** A instrumentação oficial do Nest aceita até a versão 11. O trace mostra HTTP (com o nome da rota), Prisma, Redis, RabbitMQ e MongoDB, mas não os guards, os pipes e o controller.
+- **Spans perdidos ao encerrar.** O SDK envia os spans em lote, a cada poucos segundos, e não é finalizado junto com o processo: os últimos spans antes de um restart se perdem.
+- **`traceparent` do cliente aceito.** A API continua o trace que vier no header, então um cliente pode escolher o trace id ou pedir para não amostrar. Na borda (ingress), o certo é descartar o `traceparent` externo.
+- **Amostragem de 100% e Jaeger em memória.** Toda requisição vira trace, e os traces somem quando o Jaeger reinicia. Em produção: amostragem por taxa ou no coletor, armazenamento persistente e um OpenTelemetry Collector entre os serviços e o Jaeger.
 - **Atraso medido entre dois relógios.** O `worker_event_lag_seconds` compara o horário do evento, gerado na API, com o do worker. No compose é o mesmo host; em produção, depende de os relógios estarem sincronizados (NTP).
 
 ## Interface

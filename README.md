@@ -24,7 +24,7 @@ API_PORT=3100 docker compose up -d --build --wait
 | RabbitMQ (painel) | http://localhost:15672 | usuário `corridas`, senha `corridas_dev` (só desenvolvimento) |
 | Prometheus        | http://localhost:9090  |                                                               |
 
-Para os testes de integração e para inspeção local, o MongoDB e a porta AMQP do RabbitMQ também ficam acessíveis só em `127.0.0.1` (portas 27017 e 5672, que podem ser trocadas com `MONGO_PORT` e `RABBITMQ_PORT`).
+Para os testes de integração e para inspeção local, o MongoDB, o Redis e a porta AMQP do RabbitMQ também ficam acessíveis só em `127.0.0.1` (portas 27017, 6379 e 5672, que podem ser trocadas com `MONGO_PORT`, `REDIS_PORT` e `RABBITMQ_PORT`).
 
 Para derrubar tudo e apagar os dados:
 

@@ -78,7 +78,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 
 - **Exchange `corridas`, do tipo topic.** A API publica com a routing key igual ao tipo do evento (`corrida.criada`, `corrida.status_alterado`). A fila do worker se liga com o padrão `corrida.*`. Um consumidor novo, como notificações, cria a própria fila e o próprio binding sem mudar a API.
 - **Fila `rides.worker`, do tipo quorum.** É durável e é o tipo recomendado no RabbitMQ 4. O worker usa ack manual e prefetch 10 (até 10 mensagens em processamento ao mesmo tempo).
-- **Falha temporária** (MongoDB ou Redis fora): o worker rejeita com requeue. A fila quorum do RabbitMQ 4.3 reentrega com espera crescente (1 s, 2 s, 3 s, até 10 s) e, depois de 10 entregas, manda a mensagem para a DLQ.
+- **Falha temporária** (MongoDB ou Redis fora): o worker rejeita com requeue. A fila quorum do RabbitMQ 4.3 reentrega com espera crescente (1 s, 2 s, 3 s, até 10 s). Depois de 11 entregas (a original e mais 10), em cerca de 55 segundos, a mensagem vai para a DLQ.
 - **Mensagem inválida:** rejeitada sem requeue, vai direto para a DLQ (`rides.dlx`, do tipo fanout, ligada a `rides.worker.dlq`).
 
 **Alternativas.**
@@ -87,12 +87,12 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 - Requeue imediato, que vira um loop quente enquanto o MongoDB estiver fora.
 - Fila de espera com TTL e dead letter, o padrão antes do RabbitMQ 4.3, com mais peças para manter.
 
-**Trade-off.** Depende do RabbitMQ 4.3 ou mais novo. A janela de tolerância é de cerca de 1 minuto: no teste, o worker falhou 7 vezes e processou quando o MongoDB voltou. Uma queda maior manda os eventos para a DLQ, que é reprocessada à mão.
+**Trade-off.** Depende do RabbitMQ 4.3 ou mais novo. A janela de tolerância é de cerca de 55 segundos: no teste, o worker falhou 7 vezes e processou quando o MongoDB voltou. Uma queda maior manda os eventos para a DLQ, que é reprocessada à mão.
 
 **Mensagem duplicada (entrega "pelo menos uma vez").** O RabbitMQ pode entregar a mesma mensagem mais de uma vez, por exemplo se o worker cair depois de gravar e antes do ack. Cada efeito é idempotente por si:
 
 - **MongoDB:** o `_id` do documento é o `eventId`. A segunda gravação falha com chave duplicada e é tratada como "já processado".
-- **Redis:** só grava se a versão do evento for maior que a do cache.
+- **Redis:** só grava se a versão do evento for maior que a do cache. A comparação e a gravação acontecem num script Lua, que o Redis executa inteiro sem intercalar outros comandos. Sem isso, duas mensagens da mesma corrida processadas ao mesmo tempo (o prefetch permite até 10) podiam ler a mesma versão e a mais antiga gravar por último; a revisão reproduziu o status voltando em 11 de 50 corridas.
 - **Ordem dos efeitos:** o cache é atualizado mesmo quando o histórico diz "duplicado", porque o worker pode ter caído entre o MongoDB e o Redis.
 
 ## 5. Cache
@@ -103,7 +103,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 
 - **Escrita pelo worker:** a cada evento, o worker grava a corrida no Redis com TTL de 5 minutos, só se a versão for mais nova.
 - **Leitura pela API (cache-aside):** o `GET` lê do Redis; se não achar (MISS), lê do MySQL e preenche o cache com `SET NX`, que só grava se a chave não existir, para não sobrescrever uma versão mais nova do worker. O header `X-Cache` mostra `HIT` ou `MISS`.
-- **Escritas:** o `PATCH` decide sempre pelo MySQL, nunca pelo cache.
+- **Escritas:** o `PATCH` decide sempre pelo MySQL, nunca pelo cache, e apaga a chave da corrida depois do commit (invalidação). A leitura seguinte vem do MySQL, então fica correta mesmo com o RabbitMQ ou o worker fora; o worker volta a deixar a chave quente quando processa o evento.
 - **Redis fora:** o `GET` vira MISS e segue pelo MySQL.
 
 **Alternativas.**
@@ -111,7 +111,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 - Write-through na API, gravando o cache a cada alteração; deixaria o worker sem papel no cache.
 - Só cache-aside, com a API invalidando a chave a cada alteração.
 
-**Trade-off.** Consistência eventual: entre o commit e o processamento do evento, o `GET` pode mostrar o status anterior. Normalmente são milissegundos; se a fila acumular, mais (daí o alerta de fila). O TTL de 5 minutos limita o pior caso se o worker parar.
+**Trade-off.** A leitura logo depois de uma mudança costuma ser MISS e ir ao MySQL. Há uma janela rara: um `GET` que leu o MySQL antes do commit e grava no cache depois da invalidação deixa a versão anterior até o worker processar o evento (ou o TTL de 5 minutos expirar).
 
 ## 6. MySQL para corridas, MongoDB para histórico
 

@@ -21,7 +21,10 @@ O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram ab
 - **Credenciais administrativas.** O worker usa o usuário root do MongoDB e o administrador do RabbitMQ. Em produção, usuários de aplicação com permissão mínima.
 - **DLQ sem reprocessamento automático.** Mensagens na `rides.worker.dlq` precisam ser devolvidas à fila à mão.
 - **Dead letter at-most-once.** É o padrão das quorum queues: se a DLQ estiver indisponível no momento, a mensagem se perde. O modo at-least-once exige `x-dead-letter-strategy` e `x-overflow: reject-publish`.
-- **Checagem de versão no Redis não é atômica.** Com mais de um worker, dois poderiam ler a mesma versão e gravar fora de ordem. Com um worker, como aqui, não acontece. A solução seria um script Lua, que compara e grava de uma vez.
+- **Evento antigo com a chave ausente.** A checagem de versão compara com o que está no Redis. Se a chave já expirou ou foi apagada e chega um evento antigo (por exemplo, reprocessado da DLQ), ele é gravado e fica até o próximo evento ou até o TTL.
+- **Eventos forjados.** Quem tiver credencial de publicação no RabbitMQ consegue publicar um evento falso, e o worker o grava no histórico e no cache, que o `GET` usa para autorizar a leitura. Aqui todos os serviços usam o mesmo usuário administrador. Em produção: um usuário por serviço, com a API só publicando no exchange e o worker só consumindo a fila.
+- **Dados pessoais sem retenção.** O histórico e a DLQ guardam origem, destino e o id do passageiro sem prazo de expiração. Com dados reais, seria preciso uma política de retenção (por exemplo, índice TTL no MongoDB) por causa da LGPD.
+- **Schema do evento mais frouxo no worker.** O worker aceita alguns valores que a API nunca publicaria (origem com menos de 3 caracteres, por exemplo).
 - **Contrato do evento duplicado.** O formato existe na API (tipo TypeScript) e no worker (schema zod). Em produção, um pacote compartilhado ou um schema registry.
 - **Reconexão do worker.** Se a conexão com o RabbitMQ cair, o worker encerra e o Docker o reinicia. A API reconecta na publicação seguinte.
 

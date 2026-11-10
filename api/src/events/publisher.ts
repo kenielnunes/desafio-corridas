@@ -7,9 +7,10 @@ import type { RideResponse } from '../rides/rides.service.js';
 export type EventType = 'corrida.criada' | 'corrida.status_alterado';
 
 const EXCHANGE = 'rides';
-const ESPERA_MAXIMA_CONFIRMACAO_MS = 2_000;
+const TIMEOUT_MS = 2_000;
 
 type Connection = { model: ChannelModel; channel: ConfirmChannel };
+type RideEvent = { eventId: string; type: EventType; occurredAt: string; ride: RideResponse };
 
 @Injectable()
 export class EventPublisher implements OnModuleDestroy {
@@ -21,26 +22,9 @@ export class EventPublisher implements OnModuleDestroy {
   async publish(type: EventType, ride: RideResponse): Promise<void> {
     const event = { eventId: randomUUID(), type, occurredAt: new Date().toISOString(), ride };
     try {
-      const { channel } = await this.connect();
-      await withTimeout(
-        new Promise<void>((confirmed, failed) =>
-          channel.publish(
-            EXCHANGE,
-            type,
-            Buffer.from(JSON.stringify(event)),
-            {
-              persistent: true,
-              messageId: event.eventId,
-              type: type,
-              contentType: 'application/json',
-            },
-            (error) => (error ? failed(error) : confirmed()),
-          ),
-        ),
-        ESPERA_MAXIMA_CONFIRMACAO_MS,
-      );
+      await withTimeout(this.send(event), TIMEOUT_MS);
     } catch (error) {
-      this.connection = undefined;
+      this.dropConnection();
       this.logger.error(`evento ${type} da corrida ${ride.id} não publicado: ${String(error)}`);
     }
   }
@@ -50,17 +34,45 @@ export class EventPublisher implements OnModuleDestroy {
     await connection?.model.close().catch(() => undefined);
   }
 
+  private async send(event: RideEvent) {
+    const { channel } = await this.connect();
+    await new Promise<void>((confirmed, failed) =>
+      channel.publish(
+        EXCHANGE,
+        event.type,
+        Buffer.from(JSON.stringify(event)),
+        {
+          persistent: true,
+          messageId: event.eventId,
+          type: event.type,
+          contentType: 'application/json',
+        },
+        (error) => (error ? failed(error) : confirmed()),
+      ),
+    );
+  }
+
   private connect(): Promise<Connection> {
-    this.connection ??= (async () => {
-      const model = await amqp.connect(config.rabbitmqUrl);
+    if (this.connection) return this.connection;
+    const connection: Promise<Connection> = (async () => {
+      const model = await amqp.connect(config.rabbitmqUrl, { timeout: TIMEOUT_MS });
       model.on('error', (error) => this.logger.error(`conexão com o RabbitMQ: ${String(error)}`));
-      model.on('close', () => (this.connection = undefined));
+      model.on('close', () => {
+        if (this.connection === connection) this.connection = undefined;
+      });
       const channel = await model.createConfirmChannel();
       channel.on('error', () => void model.close().catch(() => undefined));
       await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
       return { model, channel };
     })();
-    return this.connection;
+    this.connection = connection;
+    return connection;
+  }
+
+  private dropConnection() {
+    const connection = this.connection;
+    this.connection = undefined;
+    void connection?.then(({ model }) => model.close()).catch(() => undefined);
   }
 }
 
@@ -68,7 +80,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<never>((_, failed) =>
-      setTimeout(() => failed(new Error(`sem confirmação do broker em ${ms} ms`)), ms).unref(),
+      setTimeout(() => failed(new Error(`sem resposta do broker em ${ms} ms`)), ms).unref(),
     ),
   ]);
 }

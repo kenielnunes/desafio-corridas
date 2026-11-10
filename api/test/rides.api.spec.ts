@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 const API = process.env.API_URL ?? 'http://localhost:3000';
+
+// Uma espera pelo Retry-After pode passar de 1 minuto.
+vi.setConfig({ testTimeout: 90_000 });
 
 const token = (name: string) =>
   readFileSync(new URL(`../../auth-dev/tokens/${name}.jwt`, import.meta.url), 'utf8').trim();
@@ -13,6 +17,7 @@ type Options = {
   body?: unknown;
   key?: string;
   headers?: Record<string, string>;
+  retryOnLimit?: boolean;
 };
 
 async function call(method: string, path: string, options: Options = {}) {
@@ -26,6 +31,12 @@ async function call(method: string, path: string, options: Options = {}) {
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
+  // Rodando a suíte várias vezes no mesmo minuto, a cota de criações de um passageiro acaba:
+  // espera o Retry-After e tenta de novo, em vez de falhar.
+  if (response.status === 429 && options.retryOnLimit !== false) {
+    await sleep(Number(response.headers.get('retry-after') ?? 1) * 1000 + 200);
+    return call(method, path, { ...options, retryOnLimit: false });
+  }
   const text = await response.text();
   return {
     status: response.status,
@@ -34,11 +45,12 @@ async function call(method: string, path: string, options: Options = {}) {
   };
 }
 
-const createRide = (person: string, key: string = randomUUID()) =>
+const createRide = (person: string, key: string = randomUUID(), retryOnLimit = true) =>
   call('POST', '/corridas', {
     token: token(person),
     key,
     body: { origin: 'Centro', destination: 'Barra da Tijuca' },
+    retryOnLimit,
   });
 
 async function newRide(person: string) {
@@ -233,7 +245,7 @@ describe('rate limit', () => {
   it('passando do limite de criações por minuto a API responde 429 com Retry-After', async () => {
     let blocked: Awaited<ReturnType<typeof createRide>> | undefined;
     for (let attempt = 0; attempt < 11 && !blocked; attempt++) {
-      const response = await createRide('passageiro-5');
+      const response = await createRide('passageiro-5', randomUUID(), false);
       if (response.status === 429) blocked = response;
     }
     expect(blocked?.status).toBe(429);

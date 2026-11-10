@@ -285,7 +285,7 @@ pnpm e2e:headed                                 # o mesmo, abrindo o navegador n
 
 Sem o Google Chrome instalado, use o Chromium do Playwright: `pnpm --filter @corridas/e2e exec playwright install chromium` e rode com `CI=1 pnpm e2e`.
 
-Se a API estiver em outra porta, passe `API_URL=http://localhost:3100` para as duas suítes de integração. A suíte respeita o rate limit de 10 requisições de criação por minuto por passageiro; rodando mais de 3 vezes no mesmo minuto, ela começa a receber 429.
+Se a API estiver em outra porta, passe `API_URL=http://localhost:3100` para as duas suítes de integração. Se a suíte rodar várias vezes no mesmo minuto e esgotar a cota de 10 criações por minuto de um passageiro, ela espera o tempo do `Retry-After` e continua.
 
 ## Uso de IA
 

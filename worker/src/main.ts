@@ -43,8 +43,9 @@ async function handle(message: ConsumeMessage | null) {
   }
   inFlight++;
   try {
+    const correlationId: string | undefined = message.properties.correlationId;
     const { result, event, error } = await processMessage(message.content, {
-      recordHistory: (e) => history.record(e),
+      recordHistory: (e) => history.record(e, correlationId),
       updateCache: (ride) => cache.update(ride),
     });
 
@@ -53,6 +54,7 @@ async function handle(message: ConsumeMessage | null) {
 
     const context = {
       result,
+      correlation_id: correlationId,
       messageId: message.properties.messageId,
       type: event?.type,
       eventId: event?.eventId,

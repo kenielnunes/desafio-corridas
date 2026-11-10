@@ -19,7 +19,13 @@ let connection: ChannelModel;
 let channel: ConfirmChannel;
 let mongo: MongoClient;
 let redis: Redis;
-let history: Collection<{ _id: string; rideId: string; type: string; status: string }>;
+let history: Collection<{
+  _id: string;
+  rideId: string;
+  type: string;
+  status: string;
+  correlationId: string | null;
+}>;
 
 beforeAll(async () => {
   connection = await amqp.connect(RABBITMQ_URL);
@@ -50,10 +56,17 @@ async function waitFor<T>(read: () => Promise<T | null | undefined>, timeoutMs =
   throw new Error(`condição não atingida em ${timeoutMs} ms`);
 }
 
-async function callApi(method: string, path: string, person: string, body?: unknown) {
+async function callApi(
+  method: string,
+  path: string,
+  person: string,
+  body?: unknown,
+  headers: Record<string, string> = {},
+) {
   const response = await fetch(`${API}${path}`, {
     method,
     headers: {
+      ...headers,
       authorization: `Bearer ${token(person)}`,
       'idempotency-key': randomUUID(),
       'content-type': 'application/json',
@@ -175,12 +188,16 @@ describe('worker', { timeout: 30_000 }, () => {
     });
   });
 
-  it('corrida criada pela API chega ao histórico pelo worker', async () => {
-    const created = await callApi('POST', '/corridas', 'passageiro-6', {
-      origin: 'Centro',
-      destination: 'Barra da Tijuca',
-    });
+  it('corrida criada pela API chega ao histórico com o mesmo correlation id', async () => {
+    const correlationId = randomUUID();
+    const created = await callApi(
+      'POST',
+      '/corridas',
+      'passageiro-6',
+      { origin: 'Centro', destination: 'Barra da Tijuca' },
+      { 'x-correlation-id': correlationId },
+    );
     const record = await waitFor(() => history.findOne({ rideId: created.id }));
-    expect(record).toMatchObject({ type: 'corrida.criada', status: 'requested' });
+    expect(record).toMatchObject({ type: 'corrida.criada', status: 'requested', correlationId });
   });
 });

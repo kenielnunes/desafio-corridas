@@ -11,6 +11,7 @@ type HistoryDocument = {
   version: number;
   occurredAt: Date;
   processedAt: Date;
+  correlationId: string | null;
   ride: RideEvent['ride'];
 };
 
@@ -27,7 +28,7 @@ export class RideHistory {
     return new RideHistory(client, collection);
   }
 
-  async record(event: RideEvent): Promise<'new' | 'duplicate'> {
+  async record(event: RideEvent, correlationId?: string): Promise<'new' | 'duplicate'> {
     try {
       await this.collection.insertOne({
         _id: event.eventId,
@@ -37,6 +38,7 @@ export class RideHistory {
         version: event.ride.version,
         occurredAt: new Date(event.occurredAt),
         processedAt: new Date(),
+        correlationId: correlationId ?? null,
         ride: event.ride,
       });
       return 'new';

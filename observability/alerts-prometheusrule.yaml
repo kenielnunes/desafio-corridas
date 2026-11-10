@@ -28,4 +28,4 @@ spec:
             severity: warning
           annotations:
             summary: Mensagens acumulando na fila do worker.
-            description: '{{ $value }} mensagens esperando há mais de 5 minutos: o worker caiu ou não está dando conta, e o status no cache fica atrasado.'
+            description: '{{ $value }} mensagens esperando há mais de 5 minutos: o worker caiu ou não está dando conta. O histórico fica atrasado e, se a fila continuar crescendo, o RabbitMQ chega ao limite de memória ou de disco e bloqueia as publicações da API.'

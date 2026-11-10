@@ -12,6 +12,17 @@ export function correlationIdFor(request: IncomingMessage, response: ServerRespo
   return id;
 }
 
+// Registrado antes do body parser: uma requisição recusada por ele (JSON quebrado, corpo grande)
+// nunca chega ao pino-http, mas ainda devolve o id. O pino-http reaproveita o request.id.
+export function assignCorrelationId(
+  request: IncomingMessage,
+  response: ServerResponse,
+  next: () => void,
+) {
+  request.id = correlationIdFor(request, response);
+  next();
+}
+
 export const CorrelationId = createParamDecorator((_data: unknown, context: ExecutionContext) =>
   String(context.switchToHttp().getRequest<IncomingMessage>().id),
 );

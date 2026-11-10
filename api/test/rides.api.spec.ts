@@ -271,6 +271,17 @@ describe('observabilidade', () => {
     expect(replaced.headers.get('x-correlation-id')).toMatch(UUID);
   });
 
+  it('requisição recusada pelo parser de JSON também devolve o X-Correlation-Id', async () => {
+    const sent = randomUUID();
+    const response = await fetch(`${API}/corridas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-correlation-id': sent },
+      body: '{"origin":',
+    });
+    expect(response.status).toBe(400);
+    expect(response.headers.get('x-correlation-id')).toBe(sent);
+  });
+
   it('/metrics responde sem token e conta as respostas pela rota, sem o id no rótulo', async () => {
     const missing = randomUUID();
     await call('GET', `/corridas/${missing}`, { token: token('passageiro-1') });

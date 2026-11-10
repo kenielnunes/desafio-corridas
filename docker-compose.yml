@@ -1,5 +1,12 @@
 name: corridas
 
+# A API e a interface escrevem uma linha por requisição; sem limite, o Docker guarda tudo no disco.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
 services:
   mysql:
     image: mysql:8.4.13
@@ -68,6 +75,7 @@ services:
       retries: 30
 
   api:
+    logging: *logging
     build:
       context: .
       dockerfile: api/Dockerfile
@@ -107,6 +115,7 @@ services:
       start_period: 10s
 
   worker:
+    logging: *logging
     build:
       context: .
       dockerfile: worker/Dockerfile
@@ -135,6 +144,7 @@ services:
       retries: 20
 
   ui:
+    logging: *logging
     build:
       context: .
       dockerfile: ui/Dockerfile

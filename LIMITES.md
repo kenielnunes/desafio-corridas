@@ -2,6 +2,16 @@
 
 O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram abertos.
 
+## Principais riscos
+
+Os cinco que eu atacaria primeiro, em ordem. Os detalhes estão nas seções abaixo.
+
+1. **Evento perdido sem Outbox.** Se o RabbitMQ cair entre o commit no MySQL e a publicação, a corrida fica salva, mas o histórico fica sem o evento. A falha aparece no log e na métrica `events_published_total{result="failed"}`.
+2. **Rate limit em memória.** Com várias réplicas da API, cada uma conta separado, e o limite efetivo se multiplica. O contador iria para o Redis.
+3. **Credenciais administrativas compartilhadas.** A API e o worker usam o administrador do RabbitMQ, e o worker usa o root do MongoDB; quem tem acesso ao broker consegue publicar um evento falso. Em produção, um usuário por serviço, com permissão mínima.
+4. **Dados pessoais sem retenção.** O histórico e a DLQ guardam origem, destino e o id do passageiro sem prazo. Com dados reais, uma política de retenção, por causa da LGPD.
+5. **Primeira subida.** A fila é declarada pelo worker; se a API publicar antes, o evento é descartado. No compose, a API espera o worker ficar saudável.
+
 ## API
 
 - **Idempotency-Key com corpo diferente.** Reenviar a mesma chave com outro corpo devolve a corrida original. O rascunho da IETF para o header sugere responder 422, o que exigiria guardar um hash do corpo junto com a chave.

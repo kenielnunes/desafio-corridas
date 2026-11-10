@@ -37,7 +37,7 @@ docker compose down -v
 
 1. Abra http://localhost:8080 e cole o conteúdo de `auth-dev/tokens/passageiro-1.jwt` (por exemplo, `cat auth-dev/tokens/passageiro-1.jwt`).
 2. Peça uma corrida. O painel "Acompanhando" consulta a corrida a cada 2 segundos e mostra se a última leitura veio do cache (Redis) ou do banco (MySQL).
-3. Numa janela anônima, entre com `auth-dev/tokens/motorista-1.jwt`, aceite a corrida em "Corridas disponíveis" e depois inicie e finalize em "Minhas corridas".
+3. Numa janela anônima, entre com `auth-dev/tokens/motorista-1.jwt`, aceite a corrida em "Corridas disponíveis" e depois inicie e finalize em "Minhas corridas em andamento".
 4. Na janela do passageiro, o status muda sozinho: Solicitada, Aceita, Em andamento, Finalizada.
 
 ## Tokens de teste

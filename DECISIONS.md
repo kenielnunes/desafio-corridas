@@ -123,8 +123,8 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 
 - **Polling em vez de SSE ou WebSocket.** A tela consulta a corrida a cada 2 segundos. É o que o `GET` com cache foi feito para aguentar, e não exige conexão aberta nem distribuir eventos entre réplicas da API. Com mais tempo, eu usaria SSE alimentado pelo próprio worker.
 - **Mesma origem pelo nginx.** O nginx da interface serve os arquivos e repassa `/api` para a API. O navegador fala com uma origem só, então não há CORS para configurar. O nginx também envia uma Content-Security-Policy restritiva (`default-src 'self'`).
-- **Token no sessionStorage.** É o mínimo para um login de teste colando o token. Some ao fechar a aba, mas um script injetado na página conseguiria lê-lo; a CSP reduz esse risco (ver LIMITES).
-- **Idempotency-Key na tela.** A chave nasce com o formulário e só muda depois de uma criação bem-sucedida. Um duplo clique ou um reenvio depois de um erro de rede reaproveita a mesma chave, e a API devolve a corrida em vez de criar outra.
+- **Token no sessionStorage.** É o mínimo para um login de teste colando o token. Some ao fechar a aba, mas um script injetado na página conseguiria lê-lo. A CSP restringe de onde vêm os scripts, o que dificulta a injeção, sem eliminar o risco (ver LIMITES).
+- **Idempotency-Key na tela.** A chave representa a intenção: reenviar o mesmo pedido depois de um erro de rede reaproveita a chave, e a API devolve a corrida em vez de criar outra. Mudar origem ou destino é outro pedido, com chave nova.
 
 ## Interpretações de pontos ambíguos
 

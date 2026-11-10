@@ -58,3 +58,11 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
 - No QA visual, com capturas de tela, vi que na tela do motorista as "Corridas disponíveis" vinham primeiro. Com as corridas criadas pelos testes, a lista empurrava "Minhas corridas" (onde ficam Iniciar e Finalizar) para fora da tela. Inverti a ordem.
 - Primeiro deixei um `eslint-disable` do plugin `react-hooks` no hook de polling. O plugin nem está instalado, então o ESLint acusaria uma regra inexistente. Tirei a diretiva e mantive só o comentário explicando a escolha das dependências do `useEffect`.
 - Criei a persona passageiro-7, só para o e2e, pelo mesmo motivo da 6: não disputar a cota do rate limit com as outras suítes.
+- Revisão da Fase 4, agora com o QA usando Playwright no Chrome e tirando capturas. O achado mais sério: um duplo clique em "Aceitar" aceitava também a corrida de baixo. A lista do motorista se atualiza logo depois da primeira resposta, que leva uns 20 ms, e o segundo clique, uns 150 ms depois, caía no botão da corrida que tinha subido para o mesmo lugar. Os botões agora ficam travados durante a requisição e o segundo clique de um duplo clique é ignorado. Criei um e2e com duplo clique para isso não voltar.
+- Outros achados da Fase 4:
+  - **Reenvio com campos editados:** depois de um erro de rede, se o passageiro mudasse o destino e reenviasse, voltava a corrida antiga, porque a chave era a mesma. Agora a chave representa o pedido: mesmo pedido, mesma chave; pedido diferente, chave nova.
+  - **Polling sobreposto:** o polling usava `setInterval`, e uma resposta lenta podia chegar depois de uma nova e fazer o status voltar na tela. Troquei por `setTimeout` encadeado, com uma leitura de cada vez.
+  - **Aviso de erro do motorista:** ficava no topo da página, fora da área visível. Agora fica fixo.
+  - **Sessão expirada:** um token que deixava de valer não levava de volta ao login. Agora leva.
+  - **Interface aberta por HTTP fora de localhost:** a tela do passageiro ficava em branco, porque `crypto.randomUUID` só existe em contexto seguro. A chave agora vem de `crypto.getRandomValues`.
+  - **nginx:** passou a esconder a versão, a proibir a interface dentro de iframe de outro site (`frame-ancestors`), a marcar as respostas da API como `no-store` e a resolver o nome da API de novo a cada 10 s.

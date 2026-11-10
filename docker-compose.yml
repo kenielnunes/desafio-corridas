@@ -171,7 +171,8 @@ services:
       timeout: 3s
       retries: 20
 
-  # Só sobe com o profile: docker compose run --rm k6 (ver loadtest/REPORT.md).
+  # Só roda com docker compose run --rm k6, com a stack já de pé. Sem depends_on de propósito: o run
+  # recriaria a API com o rate limit padrão, desfazendo o limite alto usado no teste de carga.
   k6:
     image: grafana/k6:2.3.0
     profiles: [loadtest]
@@ -182,9 +183,6 @@ services:
     volumes:
       - ./loadtest:/scripts:ro
       - ./auth-dev/tokens:/tokens:ro
-    depends_on:
-      api:
-        condition: service_healthy
 
 volumes:
   mysql-data:

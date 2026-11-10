@@ -45,6 +45,17 @@ O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram ab
 - **Amostragem de 100% e Jaeger em memória.** Toda requisição vira trace, e os traces somem quando o Jaeger reinicia. Em produção: amostragem por taxa ou no coletor, armazenamento persistente e um OpenTelemetry Collector entre os serviços e o Jaeger.
 - **Atraso medido entre dois relógios.** O `worker_event_lag_seconds` compara o horário do evento, gerado na API, com o do worker. No compose é o mesmo host; em produção, depende de os relógios estarem sincronizados (NTP).
 
+## Kubernetes (Parte 3, não feita)
+
+Como eu faria, com o que o projeto já tem:
+
+- **Cluster local com kind e manifestos com Kustomize**, sem template: um Deployment e um Service para a API, o worker e a interface, e a infraestrutura (MySQL, RabbitMQ, Redis, MongoDB) em StatefulSets simples, só para o ambiente local.
+- **Probes:** a API e o worker já expõem `/health/live` (o processo responde) e `/health/ready` (a API consegue consultar o MySQL; o worker está consumindo). Liveness reinicia o pod travado; readiness tira o pod do Service enquanto ele não consegue atender.
+- **Resources, a partir do teste de carga:** a 20 corridas por segundo, a API usou 0,45 núcleo e uns 420 MB, e o worker, 0,13 núcleo e uns 230 MB. Na saturação, a API chegou a 1,2 núcleo e 540 MB. Eu começaria com requests perto do consumo normal (API com 500m e 512Mi, worker com 200m e 256Mi) e limite de memória com folga sobre o pico (768Mi e 384Mi). Sem limite de CPU, para não estrangular a API quando ela já é o gargalo.
+- **Configuração:** ConfigMap para o que não é segredo (issuer e audience do JWT, TTL do cache, tamanho do pool) e Secret para as URLs com senha, gerado por script a partir de variáveis de ambiente, nunca versionado. A chave pública do JWT pode ir num ConfigMap.
+- **Migração como Job** antes do Deployment da API, em vez de rodar no start do container.
+- **Escala:** o teste de carga mostrou que quem satura é a API, então eu começaria com um HPA por CPU na API, com o rate limit movido para o Redis. O KEDA, escalando o worker pelo tamanho da fila, seria o bônus, mas nesta carga a fila nunca acumulou.
+
 ## Interface
 
 - **Login de teste.** O login é colar um token. Em produção seria o fluxo do provedor de identidade (OpenID Connect), com o token num cookie HttpOnly gerenciado por um backend da interface, fora do alcance de scripts da página.

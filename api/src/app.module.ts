@@ -5,8 +5,10 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { UserRateLimitGuard } from './auth/rate-limit.guard.js';
 import { RolesGuard } from './auth/roles.guard.js';
 import { config } from './config.js';
+import { EventPublisher } from './events/publisher.js';
 import { HealthController } from './health.controller.js';
 import { PrismaService } from './prisma.service.js';
+import { RideCache } from './rides/cache.js';
 import { RidesController } from './rides/rides.controller.js';
 import { RidesService } from './rides/rides.service.js';
 
@@ -21,6 +23,8 @@ import { RidesService } from './rides/rides.service.js';
   providers: [
     PrismaService,
     RidesService,
+    EventPublisher,
+    RideCache,
     // A ordem importa: autenticação, depois perfil, depois rate limit (que conta pelo usuário já autenticado).
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

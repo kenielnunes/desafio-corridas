@@ -71,14 +71,6 @@ export class RidesService {
     return { ride, source: cached ? ('HIT' as const) : ('MISS' as const) };
   }
 
-  private async readFromDatabase(id: string) {
-    const found = await this.prisma.ride.findUnique({ where: { id } });
-    if (!found) throw new NotFoundException('corrida não encontrada');
-    const ride = toResponse(found);
-    await this.cache.fill(ride).catch(() => undefined);
-    return ride;
-  }
-
   async list(user: User, available: boolean, limit: number) {
     const rides = await this.prisma.ride.findMany({
       where: listFilter(user, available),
@@ -90,22 +82,29 @@ export class RidesService {
 
   async updateStatus(driverId: string, id: string, target: TargetStatus) {
     const onlyAssignedDriver = requiresAssignedDriver(target) ? { driverId } : {};
-    const { count } = await this.prisma.ride.updateMany({
-      where: { id, status: previousStatus(target), ...onlyAssignedDriver },
-      data: {
-        status: target,
-        version: { increment: 1 },
-        ...(target === 'accepted' ? { driverId } : {}),
-      },
+    // A leitura fica na mesma transação do UPDATE: a linha segue travada até o commit, então o
+    // retrato publicado é o desta mudança, e não o de uma mudança concorrente logo em seguida.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.ride.updateMany({
+        where: { id, status: previousStatus(target), ...onlyAssignedDriver },
+        data: {
+          status: target,
+          version: { increment: 1 },
+          ...(target === 'accepted' ? { driverId } : {}),
+        },
+      });
+      return count === 1 ? tx.ride.findUniqueOrThrow({ where: { id } }) : null;
     });
 
-    const ride = await this.prisma.ride.findUnique({ where: { id } });
-    if (!ride) throw new NotFoundException('corrida não encontrada');
-    if (count === 1) {
-      const response = toResponse(ride);
+    if (updated) {
+      const response = toResponse(updated);
+      await this.cache.invalidate(id).catch(() => undefined);
       await this.events.publish('corrida.status_alterado', response);
       return response;
     }
+
+    const ride = await this.prisma.ride.findUnique({ where: { id } });
+    if (!ride) throw new NotFoundException('corrida não encontrada');
     if (rejectionReason(ride, driverId, target) === 'other_driver') {
       throw new ForbiddenException('a corrida é de outro motorista');
     }
@@ -115,5 +114,13 @@ export class RidesService {
         ? `não é possível passar de ${ride.status} para ${target}`
         : 'mudança de status não permitida',
     );
+  }
+
+  private async readFromDatabase(id: string) {
+    const found = await this.prisma.ride.findUnique({ where: { id } });
+    if (!found) throw new NotFoundException('corrida não encontrada');
+    const ride = toResponse(found);
+    await this.cache.fill(ride).catch(() => undefined);
+    return ride;
   }
 }

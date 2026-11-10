@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -10,3 +11,7 @@ export function correlationIdFor(request: IncomingMessage, response: ServerRespo
   response.setHeader('X-Correlation-Id', id);
   return id;
 }
+
+export const CorrelationId = createParamDecorator((_data: unknown, context: ExecutionContext) =>
+  String(context.switchToHttp().getRequest<IncomingMessage>().id),
+);

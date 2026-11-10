@@ -51,12 +51,17 @@ export class RidesService {
     private readonly cache: RideCache,
   ) {}
 
-  async create(passengerId: string, idempotencyKey: string, data: CreateRide) {
+  async create(
+    passengerId: string,
+    idempotencyKey: string,
+    data: CreateRide,
+    correlationId: string,
+  ) {
     try {
       const ride = toResponse(
         await this.prisma.ride.create({ data: { passengerId, idempotencyKey, ...data } }),
       );
-      await this.events.publish('corrida.criada', ride);
+      await this.events.publish('corrida.criada', ride, correlationId);
       return { ride, replayed: false };
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
@@ -83,7 +88,7 @@ export class RidesService {
     return rides.map(toResponse);
   }
 
-  async updateStatus(driverId: string, id: string, target: TargetStatus) {
+  async updateStatus(driverId: string, id: string, target: TargetStatus, correlationId: string) {
     const onlyAssignedDriver = requiresAssignedDriver(target) ? { driverId } : {};
     // A leitura fica na mesma transação do UPDATE: a linha segue travada até o commit, então o
     // retrato publicado é o desta mudança, e não o de uma mudança concorrente logo em seguida.
@@ -102,7 +107,7 @@ export class RidesService {
     if (updated) {
       const response = toResponse(updated);
       await this.cache.invalidate(id).catch(() => undefined);
-      await this.events.publish('corrida.status_alterado', response);
+      await this.events.publish('corrida.status_alterado', response, correlationId);
       return response;
     }
 

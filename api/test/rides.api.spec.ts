@@ -7,10 +7,16 @@ const API = process.env.API_URL ?? 'http://localhost:3000';
 const token = (name: string) =>
   readFileSync(new URL(`../../auth-dev/tokens/${name}.jwt`, import.meta.url), 'utf8').trim();
 
-type Options = { token?: string; authorization?: string; body?: unknown; key?: string };
+type Options = {
+  token?: string;
+  authorization?: string;
+  body?: unknown;
+  key?: string;
+  headers?: Record<string, string>;
+};
 
 async function call(method: string, path: string, options: Options = {}) {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...options.headers };
   if (options.token) headers.authorization = `Bearer ${options.token}`;
   if (options.authorization) headers.authorization = options.authorization;
   if (options.key) headers['idempotency-key'] = options.key;
@@ -244,5 +250,24 @@ describe('cache de leitura', () => {
     const second = await read();
     expect(second.headers.get('x-cache')).toBe('HIT');
     expect(second.body).toMatchObject({ status: 'accepted', version: 2 });
+  });
+});
+
+describe('observabilidade', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+  it('devolve o X-Correlation-Id recebido e gera outro quando o recebido não é UUID', async () => {
+    const sent = randomUUID();
+    const kept = await call('GET', '/corridas', {
+      token: token('passageiro-1'),
+      headers: { 'x-correlation-id': sent },
+    });
+    expect(kept.headers.get('x-correlation-id')).toBe(sent);
+
+    const replaced = await call('GET', '/corridas', {
+      token: token('passageiro-1'),
+      headers: { 'x-correlation-id': 'texto qualquer' },
+    });
+    expect(replaced.headers.get('x-correlation-id')).toMatch(UUID);
   });
 });

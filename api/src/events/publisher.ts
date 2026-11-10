@@ -11,6 +11,7 @@ const TIMEOUT_MS = 2_000;
 
 type Connection = { model: ChannelModel; channel: ConfirmChannel };
 type RideEvent = { eventId: string; type: EventType; occurredAt: string; ride: RideResponse };
+type Message = { event: RideEvent; correlationId: string };
 
 @Injectable()
 export class EventPublisher implements OnModuleDestroy {
@@ -19,10 +20,10 @@ export class EventPublisher implements OnModuleDestroy {
 
   // Sem outbox: o evento sai depois do commit no MySQL. Se o RabbitMQ estiver fora, a corrida
   // continua criada e o evento se perde (registrado no LIMITES); por isso o erro não sobe.
-  async publish(type: EventType, ride: RideResponse): Promise<void> {
+  async publish(type: EventType, ride: RideResponse, correlationId: string): Promise<void> {
     const event = { eventId: randomUUID(), type, occurredAt: new Date().toISOString(), ride };
     try {
-      await withTimeout(this.send(event), TIMEOUT_MS);
+      await withTimeout(this.send({ event, correlationId }), TIMEOUT_MS);
     } catch (error) {
       this.dropConnection();
       this.logger.error(`evento ${type} da corrida ${ride.id} não publicado: ${String(error)}`);
@@ -34,7 +35,7 @@ export class EventPublisher implements OnModuleDestroy {
     await connection?.model.close().catch(() => undefined);
   }
 
-  private async send(event: RideEvent) {
+  private async send({ event, correlationId }: Message) {
     const { channel } = await this.connect();
     await new Promise<void>((confirmed, failed) =>
       channel.publish(
@@ -44,6 +45,7 @@ export class EventPublisher implements OnModuleDestroy {
         {
           persistent: true,
           messageId: event.eventId,
+          correlationId,
           type: event.type,
           contentType: 'application/json',
         },

@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { CurrentUser, Roles } from '../auth/decorators.js';
 import type { User } from '../auth/user.js';
 import { config } from '../config.js';
+import { CorrelationId } from '../observability/correlation.js';
 import { RidesService } from './rides.service.js';
 import {
   type CreateRide,
@@ -29,12 +30,14 @@ export class RidesController {
     @CurrentUser() user: User,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body({ schema: CreateRideSchema }) data: CreateRide,
+    @CorrelationId() correlationId: string,
     @Res({ passthrough: true }) response: Response,
   ) {
     const { ride, replayed } = await this.rides.create(
       user.id,
       parseIdempotencyKey(idempotencyKey),
       data,
+      correlationId,
     );
     if (replayed) response.setHeader('Idempotent-Replayed', 'true');
     return ride;
@@ -62,7 +65,8 @@ export class RidesController {
     @CurrentUser() user: User,
     @Param('id', { schema: RideIdSchema }) id: string,
     @Body({ schema: UpdateStatusSchema }) data: UpdateStatus,
+    @CorrelationId() correlationId: string,
   ) {
-    return this.rides.updateStatus(user.id, id, data.status);
+    return this.rides.updateStatus(user.id, id, data.status, correlationId);
   }
 }

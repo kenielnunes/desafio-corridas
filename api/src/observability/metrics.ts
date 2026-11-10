@@ -16,4 +16,16 @@ export const httpDuration = new Histogram({
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5],
 });
 
+export const cacheReads = new Counter({
+  name: 'cache_reads_total',
+  help: 'Leituras de corrida no cache, por resultado',
+  labelNames: ['result'] as const,
+});
+
+export const eventsPublished = new Counter({
+  name: 'events_published_total',
+  help: 'Eventos publicados no RabbitMQ, por resultado',
+  labelNames: ['event_type', 'result'] as const,
+});
+
 export { register };

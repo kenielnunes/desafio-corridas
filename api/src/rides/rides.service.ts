@@ -7,6 +7,7 @@ import {
 import type { User } from '../auth/user.js';
 import { EventPublisher } from '../events/publisher.js';
 import { Prisma, type Ride } from '../generated/prisma/client.js';
+import { cacheReads } from '../observability/metrics.js';
 import { PrismaService } from '../prisma.service.js';
 import { RideCache } from './cache.js';
 import {
@@ -73,7 +74,7 @@ export class RidesService {
   }
 
   async get(user: User, id: string) {
-    const cached = await this.cache.get(id).catch(() => null);
+    const cached = await this.readFromCache(id);
     const ride = cached ?? (await this.readFromDatabase(id));
     if (!canRead(ride, user)) throw new ForbiddenException('sem acesso a esta corrida');
     return { ride, source: cached ? ('HIT' as const) : ('MISS' as const) };
@@ -122,6 +123,17 @@ export class RidesService {
         ? `não é possível passar de ${ride.status} para ${target}`
         : 'mudança de status não permitida',
     );
+  }
+
+  private async readFromCache(id: string) {
+    try {
+      const ride = await this.cache.get(id);
+      cacheReads.inc({ result: ride ? 'hit' : 'miss' });
+      return ride;
+    } catch {
+      cacheReads.inc({ result: 'error' });
+      return null;
+    }
   }
 
   private async readFromDatabase(id: string) {

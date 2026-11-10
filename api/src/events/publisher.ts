@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import amqp, { type ChannelModel, type ConfirmChannel } from 'amqplib';
 import { config } from '../config.js';
+import { eventsPublished } from '../observability/metrics.js';
 import type { RideResponse } from '../rides/rides.service.js';
 
 export type EventType = 'corrida.criada' | 'corrida.status_alterado';
@@ -24,7 +25,9 @@ export class EventPublisher implements OnModuleDestroy {
     const event = { eventId: randomUUID(), type, occurredAt: new Date().toISOString(), ride };
     try {
       await withTimeout(this.send({ event, correlationId }), TIMEOUT_MS);
+      eventsPublished.inc({ event_type: type, result: 'ok' });
     } catch (error) {
+      eventsPublished.inc({ event_type: type, result: 'failed' });
       this.dropConnection();
       this.logger.error(`evento ${type} da corrida ${ride.id} não publicado: ${String(error)}`);
     }

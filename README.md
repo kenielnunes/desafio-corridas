@@ -25,6 +25,7 @@ API_PORT=3100 docker compose up -d --build --wait
 | Worker            | http://localhost:9464  | `/metrics`, `/health/live` e `/health/ready`                  |
 | RabbitMQ (painel) | http://localhost:15672 | usuário `corridas`, senha `corridas_dev` (só desenvolvimento) |
 | Prometheus        | http://localhost:9090  | alertas em http://localhost:9090/alerts                       |
+| Jaeger            | http://localhost:16686 | traces da API e do worker                                     |
 
 Para os testes de integração e para inspeção local, o MongoDB, o Redis e a porta AMQP do RabbitMQ também ficam acessíveis só em `127.0.0.1` (portas 27017, 6379 e 5672, que podem ser trocadas com `MONGO_PORT`, `REDIS_PORT` e `RABBITMQ_PORT`; a do worker, com `WORKER_PORT`).
 
@@ -228,6 +229,32 @@ Em uns 20 s, o `RidesWorkerQueueBacklog` fica "pending" em http://localhost:9090
 docker compose start worker                                       # a fila esvazia e o alerta volta a "inactive"
 docker compose exec rabbitmq rabbitmqctl purge_queue rides.worker.dlq   # as mensagens de teste eram inválidas e foram para a DLQ
 ```
+
+**Trace distribuído (OpenTelemetry e Jaeger)**
+
+A API e o worker enviam traces para o Jaeger por OTLP. O contexto viaja no header `traceparent` da mensagem do RabbitMQ, então uma corrida aparece num trace só: na API, o `POST /corridas`, as consultas do Prisma e a publicação; no worker, o consumo, a gravação no MongoDB e a atualização do Redis. Os logs das duas pontas trazem o mesmo `trace_id`. Sem a variável `OTEL_EXPORTER_OTLP_ENDPOINT`, a instrumentação nem é carregada.
+
+```bash
+CID=$(nova_chave)
+curl -s -X POST $API/corridas -H "Authorization: Bearer $P1" -H "Idempotency-Key: $(nova_chave)" \
+  -H "X-Correlation-Id: $CID" -H 'Content-Type: application/json' -d '{"origin":"Lapa","destination":"Glória"}'
+sleep 1   # dá tempo de o worker processar o evento
+docker compose logs api worker --no-log-prefix | grep "$CID" | grep -o '"trace_id":"[^"]*"'   # o mesmo id nas duas linhas
+```
+
+Abra http://localhost:16686, cole esse id em "Search by Trace ID" (ou escolha o serviço `corridas-api`) e veja os spans da API e do worker na mesma linha do tempo.
+
+## Teste de carga
+
+O script fica em `loadtest/rides.js`, e o relatório com o cenário, os números e as conclusões, em [loadtest/REPORT.md](loadtest/REPORT.md). Com a stack de pé:
+
+```bash
+RATE_LIMIT_REQUESTS_PER_MINUTE=1000000 RATE_LIMIT_CREATES_PER_MINUTE=1000000 docker compose up -d --wait api
+docker compose run --rm k6                        # 20 corridas por segundo; RIDES_PER_SECOND=100 para saturar
+docker compose up -d --wait api                   # volta ao rate limit normal
+```
+
+O rate limit sobe durante o teste porque o objetivo é medir a capacidade; com o limite normal, os 7 passageiros de teste fariam no máximo 70 corridas por minuto.
 
 ## Testes
 

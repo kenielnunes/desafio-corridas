@@ -4,6 +4,7 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.url(),
+  DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(10),
   RABBITMQ_URL: z.url(),
   REDIS_URL: z.url(),
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
@@ -19,6 +20,7 @@ const env = EnvSchema.parse(process.env);
 export const config = {
   port: env.PORT,
   databaseUrl: env.DATABASE_URL,
+  databasePoolSize: env.DATABASE_POOL_SIZE,
   rabbitmqUrl: env.RABBITMQ_URL,
   redisUrl: env.REDIS_URL,
   cacheTtlSeconds: env.CACHE_TTL_SECONDS,

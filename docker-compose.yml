@@ -73,6 +73,7 @@ services:
       dockerfile: api/Dockerfile
     environment:
       DATABASE_URL: mysql://corridas:corridas_dev@mysql:3306/corridas
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
       RABBITMQ_URL: amqp://corridas:corridas_dev@rabbitmq:5672
       REDIS_URL: redis://:redis_dev@redis:6379
       JWT_PUBLIC_KEY_FILE: /run/jwt/public-key.pem

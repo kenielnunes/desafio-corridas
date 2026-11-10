@@ -13,7 +13,8 @@ const NOT_TRACED = /^\/(health|metrics)\b/i;
 export function startTelemetry() {
   new NodeSDK({
     traceExporter: new OTLPTraceExporter(),
-    // Só o traceparent: o baggage enviado pelo cliente seguiria na mensagem até o worker.
+    // Só o contexto W3C (traceparent e tracestate), sem baggage: o baggage enviado pelo cliente
+    // seguiria na mensagem até o worker.
     textMapPropagator: new W3CTraceContextPropagator(),
     instrumentations: [
       new HttpInstrumentation({

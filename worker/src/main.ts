@@ -9,6 +9,9 @@ import { eventLag, messagesConsumed, processingDuration, register } from './metr
 import { processMessage } from './processor.js';
 import { declareTopology, QUEUE } from './topology.js';
 
+// Qualquer publicador no RabbitMQ define essa propriedade; só um UUID vai para o log e o histórico.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const log = pino({
   base: { service: 'worker' },
   timestamp: pino.stdTimeFunctions.isoTime,
@@ -49,7 +52,9 @@ async function handle(message: ConsumeMessage | null) {
   inFlight++;
   const stopTimer = processingDuration.startTimer();
   try {
-    const correlationId: string | undefined = message.properties.correlationId;
+    const received: unknown = message.properties.correlationId;
+    const correlationId =
+      typeof received === 'string' && UUID.test(received) ? received : undefined;
     const { result, event, error } = await processMessage(message.content, {
       recordHistory: (e) => history.record(e, correlationId),
       updateCache: (ride) => cache.update(ride),

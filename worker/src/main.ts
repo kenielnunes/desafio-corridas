@@ -1,10 +1,11 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 import amqp, { type ConsumeMessage } from 'amqplib';
 import { pino } from 'pino';
 import { RideCache } from './cache.js';
 import { config } from './config.js';
 import { RideHistory } from './history.js';
+import { eventLag, messagesConsumed, processingDuration, register } from './metrics.js';
 import { processMessage } from './processor.js';
 import { declareTopology, QUEUE } from './topology.js';
 
@@ -46,6 +47,7 @@ async function handle(message: ConsumeMessage | null) {
     process.exit(1);
   }
   inFlight++;
+  const stopTimer = processingDuration.startTimer();
   try {
     const correlationId: string | undefined = message.properties.correlationId;
     const { result, event, error } = await processMessage(message.content, {
@@ -55,6 +57,13 @@ async function handle(message: ConsumeMessage | null) {
 
     if (result === 'processed' || result === 'duplicate') channel.ack(message);
     else channel.reject(message, result === 'failed');
+
+    stopTimer({ result });
+    messagesConsumed.inc({ event_type: event?.type ?? 'unknown', result });
+    if (result === 'processed' && event) {
+      const lagSeconds = (Date.now() - Date.parse(event.occurredAt)) / 1000;
+      eventLag.observe({ event_type: event.type }, lagSeconds);
+    }
 
     const context = {
       result,
@@ -86,11 +95,20 @@ function statusFor(url: string | undefined) {
   return 404;
 }
 
-const server = createServer((request, response) => {
+async function serve(request: IncomingMessage, response: ServerResponse) {
+  if (request.url === '/metrics') {
+    response.writeHead(200, { 'content-type': register.contentType });
+    response.end(await register.metrics());
+    return;
+  }
   const status = statusFor(request.url);
   response.writeHead(status, { 'content-type': 'application/json' });
   response.end(JSON.stringify({ status: status === 200 ? 'ok' : 'unavailable' }));
-}).listen(config.httpPort);
+}
+
+const server = createServer((request, response) => void serve(request, response)).listen(
+  config.httpPort,
+);
 
 async function shutdown(signal: string) {
   log.info({ signal }, 'parando de consumir e terminando as mensagens em andamento');

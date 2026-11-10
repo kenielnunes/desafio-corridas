@@ -104,6 +104,8 @@ services:
       context: .
       dockerfile: worker/Dockerfile
     restart: unless-stopped
+    ports:
+      - '127.0.0.1:${WORKER_PORT:-9464}:9464'
     environment:
       RABBITMQ_URL: amqp://corridas:corridas_dev@rabbitmq:5672
       MONGO_URL: mongodb://corridas:corridas_dev@mongo:27017/?authSource=admin

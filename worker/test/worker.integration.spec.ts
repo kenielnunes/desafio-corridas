@@ -11,6 +11,7 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL ?? 'amqp://corridas:corridas_dev@l
 const MONGO_URL =
   process.env.MONGO_URL ?? 'mongodb://corridas:corridas_dev@localhost:27017/?authSource=admin';
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redis_dev@localhost:6379';
+const WORKER_METRICS_URL = process.env.WORKER_METRICS_URL ?? 'http://localhost:9464/metrics';
 
 const token = (name: string) =>
   readFileSync(new URL(`../../auth-dev/tokens/${name}.jwt`, import.meta.url), 'utf8').trim();
@@ -123,16 +124,26 @@ function versionsOfRide(id: string) {
 
 const messagesInDlq = async () => (await channel.checkQueue('rides.worker.dlq')).messageCount;
 
+async function duplicatesSeenByWorker() {
+  const text = await (await fetch(WORKER_METRICS_URL)).text();
+  return text
+    .split('\n')
+    .filter(
+      (line) => line.startsWith('worker_messages_total{') && line.includes('result="duplicate"'),
+    )
+    .reduce((total, line) => total + Number(line.split(' ').at(-1)), 0);
+}
+
 describe('worker', { timeout: 30_000 }, () => {
   it('a mesma mensagem entregue duas vezes gera um registro só, sem ir para a DLQ', async () => {
     const dlqBefore = await messagesInDlq();
+    const duplicatesBefore = await duplicatesSeenByWorker();
     const event = testEvent();
     const content = Buffer.from(JSON.stringify(event));
 
     await publish(content);
     await publish(content);
-    await waitFor(() => history.findOne({ _id: event.eventId }));
-    await sleep(500);
+    await waitFor(async () => (await duplicatesSeenByWorker()) > duplicatesBefore);
 
     expect(await history.countDocuments({ _id: event.eventId })).toBe(1);
     expect(await messagesInDlq()).toBe(dlqBefore);

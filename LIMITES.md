@@ -28,6 +28,14 @@ O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram ab
 - **Contrato do evento duplicado.** O formato existe na API (tipo TypeScript) e no worker (schema zod). Em produção, um pacote compartilhado ou um schema registry.
 - **Reconexão do worker.** Se a conexão com o RabbitMQ cair, o worker encerra e o Docker o reinicia. A API reconecta na publicação seguinte.
 
+## Observabilidade
+
+- **Alertas sem notificação.** Não há Alertmanager; os alertas só aparecem na tela do Prometheus.
+- **Regras sem teste automatizado.** O CI valida a sintaxe com o `promtool` e confere que os dois arquivos de alerta são iguais, mas não testa se cada regra dispara no cenário certo. O `promtool test rules` faz isso com séries simuladas.
+- **`/metrics` sem autenticação.** Só a rede interna do compose chega nele; o nginx da interface bloqueia `/api/metrics` para não expô-lo pelo proxy público. Em produção, uma NetworkPolicy no cluster ou autenticação no scrape.
+- **Logs só na saída do container.** Não há agregador (Loki, Elasticsearch); a busca pelo correlation id é com `docker compose logs`.
+- **Atraso medido entre dois relógios.** O `worker_event_lag_seconds` compara o horário do evento, gerado na API, com o do worker. No compose é o mesmo host; em produção, depende de os relógios estarem sincronizados (NTP).
+
 ## Interface
 
 - **Login de teste.** O login é colar um token. Em produção seria o fluxo do provedor de identidade (OpenID Connect), com o token num cookie HttpOnly gerenciado por um backend da interface, fora do alcance de scripts da página.

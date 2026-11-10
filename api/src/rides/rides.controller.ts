@@ -6,6 +6,7 @@ import type { User } from '../auth/user.js';
 import { config } from '../config.js';
 import { CorrelationId } from '../observability/correlation.js';
 import { RidesService } from './rides.service.js';
+import { visibleTo } from './rules.js';
 import {
   type CreateRide,
   CreateRideSchema,
@@ -44,8 +45,9 @@ export class RidesController {
   }
 
   @Get()
-  list(@CurrentUser() user: User, @Query({ schema: ListRidesSchema }) query: ListRides) {
-    return this.rides.list(user, query);
+  async list(@CurrentUser() user: User, @Query({ schema: ListRidesSchema }) query: ListRides) {
+    const rides = await this.rides.list(user, query);
+    return rides.map((ride) => visibleTo(user, ride));
   }
 
   @Get(':id')
@@ -56,17 +58,17 @@ export class RidesController {
   ) {
     const { ride, source } = await this.rides.get(user, id);
     response.setHeader('X-Cache', source);
-    return ride;
+    return visibleTo(user, ride);
   }
 
   @Patch(':id/status')
   @Roles('motorista')
-  updateStatus(
+  async updateStatus(
     @CurrentUser() user: User,
     @Param('id', { schema: RideIdSchema }) id: string,
     @Body({ schema: UpdateStatusSchema }) data: UpdateStatus,
     @CorrelationId() correlationId: string,
   ) {
-    return this.rides.updateStatus(user.id, id, data.status, correlationId);
+    return visibleTo(user, await this.rides.updateStatus(user.id, id, data.status, correlationId));
   }
 }

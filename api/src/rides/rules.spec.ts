@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { canRead, previousStatus, rejectionReason, requiresAssignedDriver } from './rules.js';
+import {
+  canRead,
+  previousStatus,
+  rejectionReason,
+  requiresAssignedDriver,
+  visibleTo,
+} from './rules.js';
 
 const passenger1 = { id: 'passageiro-1', role: 'passageiro' } as const;
 const passenger2 = { id: 'passageiro-2', role: 'passageiro' } as const;
@@ -76,5 +82,17 @@ describe('por que uma mudança de status foi recusada', () => {
     expect(rejectionReason(ride('accepted', 'motorista-2'), 'motorista-1', 'accepted')).toBe(
       'invalid_transition',
     );
+  });
+});
+
+describe('o que cada perfil vê', () => {
+  const ride = { id: 'r1', passengerId: 'passageiro-1', driverId: null };
+
+  it('o motorista não recebe o id do passageiro', () => {
+    expect(JSON.parse(JSON.stringify(visibleTo(driver1, ride)))).not.toHaveProperty('passengerId');
+  });
+
+  it('o passageiro recebe a corrida inteira', () => {
+    expect(visibleTo(passenger1, ride)).toEqual(ride);
   });
 });

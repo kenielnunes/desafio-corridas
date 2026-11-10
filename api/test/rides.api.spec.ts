@@ -142,6 +142,7 @@ describe('listagem por perfil', () => {
     });
     expect(ids(body)).toContain(available);
     expect(body.every((ride: { status: string }) => ride.status === 'requested')).toBe(true);
+    expect(body.some((ride: object) => 'passengerId' in ride)).toBe(false);
   });
 
   it('sem filtro, o motorista vê só as corridas dele', async () => {

@@ -34,3 +34,9 @@ export function canRead(ride: RideForRules, user: User): boolean {
   if (user.role === 'passageiro') return ride.passengerId === user.id;
   return ride.status === 'requested' || ride.driverId === user.id;
 }
+
+// O motorista não precisa saber quem é o passageiro (minimização de dados da LGPD). Com
+// undefined, o campo some do JSON da resposta; o cache e o evento continuam com ele.
+export function visibleTo<T extends { passengerId: string }>(user: User, ride: T) {
+  return user.role === 'motorista' ? { ...ride, passengerId: undefined } : ride;
+}

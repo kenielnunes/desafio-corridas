@@ -2,7 +2,7 @@ export type RideStatus = 'requested' | 'accepted' | 'in_progress' | 'finished';
 
 export type Ride = {
   id: string;
-  passengerId: string;
+  passengerId?: string;
   driverId: string | null;
   origin: string;
   destination: string;

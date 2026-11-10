@@ -131,7 +131,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 **Por que esses limiares.**
 
 - **5% de erros:** em operação normal, a taxa de 5xx é zero; uma requisição falhando em cada 20 já é incidente, não ruído. Os 5 minutos seguidos evitam alertar por um pico curto, como o reinício de um container.
-- **100 mensagens:** limiar provisório. O valor certo depende da vazão do worker, que o teste de carga (k6) vai medir. A ideia é alertar quando a fila tiver mais trabalho do que o worker esvazia em poucos segundos e continuar assim por 5 minutos; uma rajada que esvazia sozinha não deve alertar.
+- **100 mensagens:** no teste de carga ([loadtest/REPORT.md](loadtest/REPORT.md)), a fila ficou em zero em todas as coletas, mesmo com a API no limite e o worker recebendo 375 eventos por segundo. Então um acúmulo que dura 5 minutos indica worker parado ou dependência lenta, e não pico de tráfego. Com os 80 eventos por segundo da rodada de 20 corridas, um worker parado passa de 100 mensagens em pouco mais de 1 segundo; o limiar só deixa de fora oscilações entre uma coleta e outra. Os 5 minutos seguidos evitam alertar no reinício do worker ou num deploy.
 
 **Alternativas.**
 
@@ -139,7 +139,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 - **Latência p95 da API.** Bom candidato a terceiro alerta; entre os dois, preferi o erro, que é o sintoma mais direto.
 - **Falha ao publicar evento (`events_published_total{result="failed"}`).** Também seria um bom terceiro: é o único sinal de evento perdido, já que a API não devolve erro nesse caso.
 
-**Trade-off.** Com pouco tráfego, um erro isolado já passa de 5% (1 erro em 10 requisições) e pode disparar o alerta; com mais tempo, eu exigiria um volume mínimo de requisições na regra. Os dois alertas dependem da coleta: com a API fora do ar, as séries somem e o alerta de erro não dispara (um alerta de `up == 0` cobriria esse caso). Eles também não notificam ninguém: sem Alertmanager, como o enunciado permite, o estado aparece em http://localhost:9090/alerts.
+**Trade-off.** Com pouco tráfego, um erro isolado já passa de 5% (1 erro em 10 requisições) e pode disparar o alerta; com mais tempo, eu exigiria um volume mínimo de requisições na regra. O tráfego baixo também atrasa o alerta da fila: com um evento a cada 10 segundos, ela leva uns 17 minutos para chegar a 100. Os dois alertas dependem da coleta: com a API fora do ar, as séries somem e o alerta de erro não dispara (um alerta de `up == 0` cobriria esse caso). Eles também não notificam ninguém: sem Alertmanager, como o enunciado permite, o estado aparece em http://localhost:9090/alerts.
 
 ## Notas sobre a interface
 

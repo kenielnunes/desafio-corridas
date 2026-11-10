@@ -42,7 +42,7 @@ export class RidesController {
 
   @Get()
   list(@CurrentUser() user: User, @Query({ schema: ListRidesSchema }) query: ListRides) {
-    return this.rides.list(user, query.available, query.limit);
+    return this.rides.list(user, query);
   }
 
   @Get(':id')

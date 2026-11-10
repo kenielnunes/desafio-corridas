@@ -32,9 +32,12 @@ export const toResponse = (ride: Ride) => ({
 
 export type RideResponse = ReturnType<typeof toResponse>;
 
-function listFilter(user: User, available: boolean) {
+function listFilter(user: User, available: boolean, active: boolean) {
   if (user.role === 'passageiro') return { passengerId: user.id };
-  return available ? { status: 'requested' as const } : { driverId: user.id };
+  if (available) return { status: 'requested' as const };
+  return active
+    ? { driverId: user.id, status: { in: ['accepted' as const, 'in_progress' as const] } }
+    : { driverId: user.id };
 }
 
 const isUniqueViolation = (error: unknown) =>
@@ -71,11 +74,11 @@ export class RidesService {
     return { ride, source: cached ? ('HIT' as const) : ('MISS' as const) };
   }
 
-  async list(user: User, available: boolean, limit: number) {
+  async list(user: User, filter: { available: boolean; active: boolean; limit: number }) {
     const rides = await this.prisma.ride.findMany({
-      where: listFilter(user, available),
+      where: listFilter(user, filter.available, filter.active),
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: filter.limit,
     });
     return rides.map(toResponse);
   }

@@ -37,6 +37,8 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: corridas_dev
     volumes:
       - mongo-data:/data/db
+    ports:
+      - '127.0.0.1:${MONGO_PORT:-27017}:27017'
     healthcheck:
       # pelo hostname e não por 127.0.0.1: durante o init o mongod temporário só escuta em localhost
       test:
@@ -56,6 +58,7 @@ services:
       - rabbitmq-data:/var/lib/rabbitmq
     ports:
       - '127.0.0.1:15672:15672'
+      - '127.0.0.1:${RABBITMQ_PORT:-5672}:5672'
     healthcheck:
       test: ['CMD', 'rabbitmq-diagnostics', '-q', 'check_port_connectivity']
       interval: 10s
@@ -68,6 +71,8 @@ services:
       dockerfile: api/Dockerfile
     environment:
       DATABASE_URL: mysql://corridas:corridas_dev@mysql:3306/corridas
+      RABBITMQ_URL: amqp://corridas:corridas_dev@rabbitmq:5672
+      REDIS_URL: redis://:redis_dev@redis:6379
       JWT_PUBLIC_KEY_FILE: /run/jwt/public-key.pem
       JWT_ISSUER: corridas-auth-dev
       JWT_AUDIENCE: corridas-api
@@ -78,12 +83,41 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # o worker declara a fila; sem ela, eventos publicados na primeira subida seriam descartados
+      worker:
+        condition: service_healthy
     healthcheck:
       test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:3000/health/ready']
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      RABBITMQ_URL: amqp://corridas:corridas_dev@rabbitmq:5672
+      MONGO_URL: mongodb://corridas:corridas_dev@mongo:27017/?authSource=admin
+      REDIS_URL: redis://:redis_dev@redis:6379
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:9464/health/ready']
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   prometheus:
     image: prom/prometheus:v3.15.1

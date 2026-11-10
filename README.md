@@ -149,7 +149,8 @@ docker compose exec redis redis-cli DEL ride:$ID      # a próxima leitura é MI
 
 ```bash
 EVENTO_ID=$(nova_chave)
-EVENTO="{\"eventId\":\"$EVENTO_ID\",\"type\":\"corrida.criada\",\"occurredAt\":\"2026-11-09T12:00:00.000Z\",\"ride\":{\"id\":\"$(nova_chave)\",\"passengerId\":\"demo\",\"driverId\":null,\"origin\":\"Centro\",\"destination\":\"Barra\",\"status\":\"requested\",\"version\":1,\"createdAt\":\"2026-11-09T12:00:00.000Z\",\"updatedAt\":\"2026-11-09T12:00:00.000Z\"}}"
+AGORA=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+EVENTO="{\"eventId\":\"$EVENTO_ID\",\"type\":\"corrida.criada\",\"occurredAt\":\"$AGORA\",\"ride\":{\"id\":\"$(nova_chave)\",\"passengerId\":\"demo\",\"driverId\":null,\"origin\":\"Centro\",\"destination\":\"Barra\",\"status\":\"requested\",\"version\":1,\"createdAt\":\"$AGORA\",\"updatedAt\":\"$AGORA\"}}"
 publicar() { docker compose exec rabbitmq rabbitmqadmin --username corridas --password corridas_dev \
   publish message --exchange rides --routing-key corrida.criada --payload "$1"; }
 publicar "$EVENTO"; publicar "$EVENTO"

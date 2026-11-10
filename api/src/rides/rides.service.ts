@@ -5,8 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { User } from '../auth/user.js';
+import { EventPublisher } from '../events/publisher.js';
 import { Prisma, type Ride } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma.service.js';
+import { RideCache } from './cache.js';
 import {
   canRead,
   previousStatus,
@@ -24,9 +26,11 @@ export const toResponse = (ride: Ride) => ({
   destination: ride.destination,
   status: ride.status,
   version: ride.version,
-  createdAt: ride.createdAt,
-  updatedAt: ride.updatedAt,
+  createdAt: ride.createdAt.toISOString(),
+  updatedAt: ride.updatedAt.toISOString(),
 });
+
+export type RideResponse = ReturnType<typeof toResponse>;
 
 function listFilter(user: User, available: boolean) {
   if (user.role === 'passageiro') return { passengerId: user.id };
@@ -38,14 +42,19 @@ const isUniqueViolation = (error: unknown) =>
 
 @Injectable()
 export class RidesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventPublisher,
+    private readonly cache: RideCache,
+  ) {}
 
   async create(passengerId: string, idempotencyKey: string, data: CreateRide) {
     try {
-      const ride = await this.prisma.ride.create({
-        data: { passengerId, idempotencyKey, ...data },
-      });
-      return { ride: toResponse(ride), replayed: false };
+      const ride = toResponse(
+        await this.prisma.ride.create({ data: { passengerId, idempotencyKey, ...data } }),
+      );
+      await this.events.publish('corrida.criada', ride);
+      return { ride, replayed: false };
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
       const existing = await this.prisma.ride.findUniqueOrThrow({
@@ -56,10 +65,18 @@ export class RidesService {
   }
 
   async get(user: User, id: string) {
-    const ride = await this.prisma.ride.findUnique({ where: { id } });
-    if (!ride) throw new NotFoundException('corrida não encontrada');
+    const cached = await this.cache.get(id).catch(() => null);
+    const ride = cached ?? (await this.readFromDatabase(id));
     if (!canRead(ride, user)) throw new ForbiddenException('sem acesso a esta corrida');
-    return toResponse(ride);
+    return { ride, source: cached ? ('HIT' as const) : ('MISS' as const) };
+  }
+
+  private async readFromDatabase(id: string) {
+    const found = await this.prisma.ride.findUnique({ where: { id } });
+    if (!found) throw new NotFoundException('corrida não encontrada');
+    const ride = toResponse(found);
+    await this.cache.fill(ride).catch(() => undefined);
+    return ride;
   }
 
   async list(user: User, available: boolean, limit: number) {
@@ -84,7 +101,11 @@ export class RidesService {
 
     const ride = await this.prisma.ride.findUnique({ where: { id } });
     if (!ride) throw new NotFoundException('corrida não encontrada');
-    if (count === 1) return toResponse(ride);
+    if (count === 1) {
+      const response = toResponse(ride);
+      await this.events.publish('corrida.status_alterado', response);
+      return response;
+    }
     if (rejectionReason(ride, driverId, target) === 'other_driver') {
       throw new ForbiddenException('a corrida é de outro motorista');
     }

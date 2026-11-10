@@ -46,8 +46,14 @@ export class RidesController {
   }
 
   @Get(':id')
-  get(@CurrentUser() user: User, @Param('id', { schema: RideIdSchema }) id: string) {
-    return this.rides.get(user, id);
+  async get(
+    @CurrentUser() user: User,
+    @Param('id', { schema: RideIdSchema }) id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { ride, source } = await this.rides.get(user, id);
+    response.setHeader('X-Cache', source);
+    return ride;
   }
 
   @Patch(':id/status')

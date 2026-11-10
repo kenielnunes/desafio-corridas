@@ -8,7 +8,7 @@ import { PinoInstrumentation } from '@opentelemetry/instrumentation-pino';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { PrismaInstrumentation } from '@prisma/instrumentation';
 
-const NOT_TRACED = /^\/(health|metrics)\b/;
+const NOT_TRACED = /^\/(health|metrics)\b/i;
 
 export function startTelemetry() {
   new NodeSDK({

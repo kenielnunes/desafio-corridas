@@ -32,3 +32,14 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
   - **Mensagem do 409:** revelava o status de uma corrida que o motorista não podia ler.
   - **Teste unitário:** eu testava uma função (`isTransitionAllowed`) que a produção nem usava. Passei a testar a que o service usa.
 - O que ficou como limite, e não correção: o motorista vê o id do passageiro (LGPD), a API usa a mesma credencial que aplica as migrações, e o reenvio idempotente consome a cota do rate limit.
+
+## 2026-11-09 (Fases 2 e 3: RabbitMQ, worker, MongoDB e Redis)
+
+- Escolhi não reconectar o worker automaticamente: se a conexão com o RabbitMQ cair, o processo encerra e o Docker reinicia (`restart: unless-stopped`). As mensagens sem ack voltam para a fila, e o worker é idempotente. É o jeito mais simples que sei explicar.
+- Testei a falha temporária de verdade: derrubei o MongoDB, criei uma corrida e o worker falhou 7 vezes, com intervalos crescentes (6 s, 7 s, 8 s...: 5 s de timeout do driver mais 1 s, 2 s, 3 s de espera do RabbitMQ). Religuei o MongoDB e ele processou na tentativa seguinte, sem cair na DLQ.
+- Antes disso, o driver do MongoDB esperava até 30 s para desistir de cada operação, e o worker ficava parado nesse tempo. Baixei o `serverSelectionTimeoutMS` para 5 s, para a falha aparecer rápido e o ritmo das novas tentativas ficar com o RabbitMQ.
+- Logo depois de subir, a fila mostrava 1 mensagem com o consumidor ativo. Investiguei com `rabbitmqctl list_queues name messages_ready messages_unacknowledged`: era a mensagem sendo processada no instante da listagem.
+- As suítes da API e do worker usavam o mesmo passageiro-2 e esbarraram juntas no rate limit (429). Criei a passageiro-6, exclusiva dos testes do worker.
+- O teste do "evento atrasado não faz o status voltar" passaria mesmo sem a checagem de versão se a chave do cache tivesse expirado, porque a leitura viria do MySQL. Passei a exigir `X-Cache: HIT` no teste.
+- Para o README, o `curl` na API HTTP do painel exigia escapar o JSON com `sed`. Descobri que a imagem do RabbitMQ traz o `rabbitmqadmin` 2, e o comando ficou legível.
+- Testei o Redis fora do ar. A API seguiu respondendo: `GET` em 4 ms vindo do MySQL (`X-Cache: MISS`), `POST` 201 e readiness 200. No worker, o evento da corrida criada nesse intervalo gravou o histórico no MongoDB, falhou no cache e voltou para a fila. Quando o Redis subiu, a reentrega encontrou o histórico já gravado ("duplicado") e completou o cache. Foi exatamente o caso que me fez atualizar o cache mesmo quando o evento é duplicado.

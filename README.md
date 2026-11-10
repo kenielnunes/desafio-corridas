@@ -24,6 +24,8 @@ API_PORT=3100 docker compose up -d --build --wait
 | RabbitMQ (painel) | http://localhost:15672 | usuário `corridas`, senha `corridas_dev` (só desenvolvimento) |
 | Prometheus        | http://localhost:9090  |                                                               |
 
+Para os testes de integração e para inspeção local, o MongoDB e a porta AMQP do RabbitMQ também ficam acessíveis só em `127.0.0.1` (portas 27017 e 5672, que podem ser trocadas com `MONGO_PORT` e `RABBITMQ_PORT`).
+
 Para derrubar tudo e apagar os dados:
 
 ```bash
@@ -34,12 +36,12 @@ docker compose down -v
 
 A pasta `auth-dev/tokens/` tem tokens JWT **de teste**, assinados por uma chave privada que foi descartada. A API só conhece a chave pública (`auth-dev/public-key.pem`).
 
-| Arquivo                                 | Para quê                                |
-| --------------------------------------- | --------------------------------------- |
-| `passageiro-1.jwt` a `passageiro-5.jwt` | passageiros                             |
-| `motorista-1.jwt` e `motorista-2.jwt`   | motoristas                              |
-| `expired.jwt`                           | demonstrar o 401 de token vencido       |
-| `other-key.jwt`                         | demonstrar o 401 de assinatura inválida |
+| Arquivo                                 | Para quê                                 |
+| --------------------------------------- | ---------------------------------------- |
+| `passageiro-1.jwt` a `passageiro-6.jwt` | passageiros (o 6 é dos testes do worker) |
+| `motorista-1.jwt` e `motorista-2.jwt`   | motoristas                               |
+| `expired.jwt`                           | demonstrar o 401 de token vencido        |
+| `other-key.jwt`                         | demonstrar o 401 de assinatura inválida  |
 
 Os tokens valem até novembro de 2027. Para gerar um par de chaves e tokens novos:
 
@@ -114,17 +116,67 @@ for i in $(seq 1 11); do
 done; echo
 ```
 
+## Roteiro de validação do fluxo assíncrono
+
+Cada criação e cada mudança de status publica um evento no RabbitMQ. O worker consome, grava o histórico no MongoDB e atualiza o cache no Redis. Use as variáveis do roteiro anterior e uma corrida recém-criada:
+
+```bash
+ID=$(curl -s -X POST $API/corridas -H "Authorization: Bearer $P1" -H "Idempotency-Key: $(nova_chave)" \
+  -H 'Content-Type: application/json' -d '{"origin":"Centro","destination":"Urca"}' | sed -nE 's/.*"id":"([^"]+)".*/\1/p')
+```
+
+**Histórico no MongoDB e cache no Redis**
+
+```bash
+docker compose exec mongo mongosh --quiet -u corridas -p corridas_dev --authenticationDatabase admin corridas \
+  --eval "db.ride_history.find({ rideId: '$ID' }).toArray()"
+curl -s -D - -o /dev/null -H "Authorization: Bearer $P1" $API/corridas/$ID | grep -i x-cache   # HIT: veio do Redis
+docker compose exec redis redis-cli GET ride:$ID
+docker compose exec redis redis-cli TTL ride:$ID      # segundos até expirar (começa em 300)
+docker compose exec redis redis-cli DEL ride:$ID      # a próxima leitura é MISS e vem do MySQL
+```
+
+**Mensagem duplicada: a mesma mensagem entregue duas vezes gera um registro só**
+
+```bash
+EVENTO_ID=$(nova_chave)
+EVENTO="{\"eventId\":\"$EVENTO_ID\",\"type\":\"corrida.criada\",\"occurredAt\":\"2026-11-09T12:00:00.000Z\",\"ride\":{\"id\":\"$(nova_chave)\",\"passengerId\":\"demo\",\"driverId\":null,\"origin\":\"Centro\",\"destination\":\"Barra\",\"status\":\"requested\",\"version\":1,\"createdAt\":\"2026-11-09T12:00:00.000Z\",\"updatedAt\":\"2026-11-09T12:00:00.000Z\"}}"
+publicar() { docker compose exec rabbitmq rabbitmqadmin --username corridas --password corridas_dev \
+  publish message --exchange rides --routing-key corrida.criada --payload "$1"; }
+publicar "$EVENTO"; publicar "$EVENTO"
+docker compose logs worker | grep "$EVENTO_ID"     # result "processed" na primeira e "duplicate" na segunda
+```
+
+**Mensagem inválida vai para a fila de erros (DLQ)**
+
+```bash
+publicar 'isto não é um evento'
+sleep 5   # as contagens do rabbitmqctl são atualizadas de tempos em tempos
+docker compose exec rabbitmq rabbitmqctl list_queues name messages | grep rides   # rides.worker.dlq cresce
+```
+
+**Falha temporária: com o MongoDB fora, o RabbitMQ reentrega com espera crescente**
+
+```bash
+docker compose stop mongo
+curl -s -X POST $API/corridas -H "Authorization: Bearer $P1" -H "Idempotency-Key: $(nova_chave)" \
+  -H 'Content-Type: application/json' -d '{"origin":"Lapa","destination":"Leme"}'
+docker compose logs -f worker      # "falhou; o RabbitMQ vai reentregar", com intervalos crescentes
+docker compose start mongo         # em outro terminal: o próximo intervalo termina em "processado"
+```
+
 ## Testes
 
 Pré-requisito: Node 24 e pnpm (`corepack enable`).
 
 ```bash
 pnpm install
-pnpm test                                  # unitários (regras de status e de permissão)
-pnpm --filter @corridas/api test:api       # testes de API, com o compose de pé
+pnpm test                                       # unitários (regras da API e decisões do worker)
+pnpm --filter @corridas/api test:api            # testes de API, com o compose de pé
+pnpm --filter @corridas/worker test:integration  # worker: duplicata, DLQ, evento atrasado, fluxo completo
 ```
 
-Se a API estiver em outra porta: `API_URL=http://localhost:3100 pnpm --filter @corridas/api test:api`. A suíte respeita o rate limit de 10 requisições de criação por minuto por passageiro; rodando mais de 3 vezes no mesmo minuto, ela começa a receber 429.
+Se a API estiver em outra porta, passe `API_URL=http://localhost:3100` para as duas suítes de integração. A suíte respeita o rate limit de 10 requisições de criação por minuto por passageiro; rodando mais de 3 vezes no mesmo minuto, ela começa a receber 429.
 
 ## Documentos
 

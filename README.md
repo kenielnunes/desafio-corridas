@@ -25,10 +25,11 @@ Pré-requisito: Docker com Compose.
 docker compose up -d --build --wait
 ```
 
-Se a porta 3000 ou a 8080 já estiver ocupada na sua máquina, escolha outra (`API_PORT`, `UI_PORT`) e use-a nos comandos abaixo:
+Se a porta 3000 ou a 8080 já estiver ocupada na sua máquina, grave outra no arquivo `.env` (`API_PORT`, `UI_PORT`). O compose lê esse arquivo sozinho, então a porta vale para todos os comandos seguintes, inclusive os que recriam a API no teste de carga. Use a mesma porta nos comandos abaixo.
 
 ```bash
-API_PORT=3100 docker compose up -d --build --wait
+echo API_PORT=3100 >> .env
+docker compose up -d --build --wait
 ```
 
 | Serviço           | Endereço               | Observação                                                    |

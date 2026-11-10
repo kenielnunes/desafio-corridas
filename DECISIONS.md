@@ -76,7 +76,7 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 
 **Escolha.**
 
-- **Exchange `corridas`, do tipo topic.** A API publica com a routing key igual ao tipo do evento (`corrida.criada`, `corrida.status_alterado`). A fila do worker se liga com o padrão `corrida.*`. Um consumidor novo, como notificações, cria a própria fila e o próprio binding sem mudar a API.
+- **Exchange `rides`, do tipo topic.** A API publica com a routing key igual ao tipo do evento (`corrida.criada`, `corrida.status_alterado`). A fila do worker se liga com o padrão `corrida.*`. Um consumidor novo, como notificações, cria a própria fila e o próprio binding sem mudar a API.
 - **Fila `rides.worker`, do tipo quorum.** É durável e é o tipo recomendado no RabbitMQ 4. O worker usa ack manual e prefetch 10 (até 10 mensagens em processamento ao mesmo tempo).
 - **Falha temporária** (MongoDB ou Redis fora): o worker rejeita com requeue. A fila quorum do RabbitMQ 4.3 reentrega com espera crescente (1 s, 2 s, 3 s, até 10 s). Depois de 11 entregas (a original e mais 10), em cerca de 55 segundos, a mensagem vai para a DLQ.
 - **Mensagem inválida:** rejeitada sem requeue, vai direto para a DLQ (`rides.dlx`, do tipo fanout, ligada a `rides.worker.dlq`).

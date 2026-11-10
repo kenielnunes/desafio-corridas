@@ -141,6 +141,27 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 
 **Trade-off.** Com pouco tráfego, um erro isolado já passa de 5% (1 erro em 10 requisições) e pode disparar o alerta; com mais tempo, eu exigiria um volume mínimo de requisições na regra. O tráfego baixo também atrasa o alerta da fila: com um evento a cada 10 segundos, ela leva uns 17 minutos para chegar a 100. Os dois alertas dependem da coleta: com a API fora do ar, as séries somem e o alerta de erro não dispara (um alerta de `up == 0` cobriria esse caso). Eles também não notificam ninguém: sem Alertmanager, como o enunciado permite, o estado aparece em http://localhost:9090/alerts.
 
+## 8. Do zero, eu manteria o RabbitMQ?
+
+**Contexto.** Entrada pedida pelo enunciado: desenvolvendo o sistema do zero, sem tecnologias definidas, eu manteria o RabbitMQ ou escolheria outro broker?
+
+**Escolha.** Manteria o RabbitMQ.
+
+**Por quê.**
+
+- **O problema é fila de trabalho.** Cada evento precisa chegar a cada consumidor interessado e ser processado com confirmação (ack), reentrega com espera e fila de erros. O RabbitMQ faz isso de forma nativa: a quorum queue do 4.3 reentrega com atraso crescente e manda para a DLQ depois do limite, sem código nosso (entrada 4).
+- **O volume, numa conta exagerada para o Rio.** Sem o número real de corridas, usei um teto exagerado de propósito: os cerca de 6,7 milhões de habitantes do Rio pedindo uma corrida por dia cada um. Dá umas 78 corridas por segundo na média e umas 230 no pico, supondo o triplo da média; com 4 eventos por corrida, uns 930 eventos por segundo. No teste de carga, o broker não foi o gargalo em nenhuma rodada: um worker com um quarto de núcleo processou 375 eventos por segundo sem acumular fila, e quem saturou antes foi a API, perto de 70 corridas por segundo por instância. Para esse teto, o caminho seria mais réplicas da API e do worker, com o RabbitMQ distribuindo as mensagens entre os workers da mesma fila, e um teste de carga nesse patamar para confirmar.
+- **Roteamento flexível.** Com o exchange topic, um consumidor novo, como notificações, cria a própria fila e o próprio binding sem mudar a API.
+- **Operação simples.** Um nó no compose, painel de gerenciamento e métricas para o Prometheus sem exporter separado.
+
+**Alternativas.**
+
+- **Kafka.** Vale quando o volume é muito alto ou quando é preciso reler eventos antigos: o log fica retido, e um consumidor novo pode processar tudo desde o início. Seria a escolha para o rastreamento em tempo real da posição dos táxis, com a frota inteira mandando a posição a cada poucos segundos, ou para análise de dados. O custo é que partições, offsets e reprocessamento ficam com o consumidor, e reentrega com espera e DLQ não vêm prontas.
+- **Serviço gerenciado (SQS, Pub/Sub).** Tira a operação do broker, mas prende a um provedor de nuvem, e o enunciado não avalia serviços pagos.
+- **Redis Streams.** Já temos Redis, mas o tratamento de mensagens pendentes e de falhas dependeria de mais código nosso.
+
+**Trade-off.** O RabbitMQ não guarda o evento depois do ack. Para reprocessar o histórico do zero, a fonte seria o MongoDB, que guarda um documento por evento, e não o broker.
+
 ## Notas sobre a interface
 
 - **Polling em vez de SSE ou WebSocket.** A tela consulta a corrida a cada 2 segundos. É o que o `GET` com cache foi feito para aguentar, e não exige conexão aberta nem distribuir eventos entre réplicas da API. Com mais tempo, eu usaria SSE alimentado pelo próprio worker.

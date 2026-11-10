@@ -66,3 +66,15 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
   - **Sessão expirada:** um token que deixava de valer não levava de volta ao login. Agora leva.
   - **Interface aberta por HTTP fora de localhost:** a tela do passageiro ficava em branco, porque `crypto.randomUUID` só existe em contexto seguro. A chave agora vem de `crypto.getRandomValues`.
   - **nginx:** passou a esconder a versão, a proibir a interface dentro de iframe de outro site (`frame-ancestors`), a marcar as respostas da API como `no-store` e a resolver o nome da API de novo a cada 10 s.
+
+## 2026-11-09 e 2026-11-10 (Fase 5: logs, métricas e alertas)
+
+- Logs com `nestjs-pino` na API e `pino` no worker, os dois em JSON. Escolhi o correlation id em vez de esperar o trace_id do OpenTelemetry (Fase 6) porque ele já atravessa a fila sozinho: vai na propriedade `correlationId` da mensagem AMQP, que existe para isso.
+- O `X-Correlation-Id` vindo do cliente só é aceito se for UUID. Sem essa checagem, qualquer texto enviado no header iria parar nos logs.
+- A métrica HTTP começou a ser pensada como interceptor do Nest, mas os interceptors rodam depois dos guards: os 401, 403 e 429 ficariam fora da contagem. Virou um middleware do Express, que vê toda requisição.
+- O rótulo da rota é o template (`/corridas/:id`) e não a URL. Com a URL, cada corrida viraria uma série nova no Prometheus. Um teste confere que o id não aparece no `/metrics`.
+- Para provar a propagação do correlation id num teste automatizado, o worker passou a gravá-lo no histórico do MongoDB. O teste envia um id conhecido na API e o encontra no documento do histórico.
+- O teste de mensagem duplicada esperava 500 ms "para dar tempo" de a segunda entrega chegar. Agora espera o contador `worker_messages_total{result="duplicate"}` subir, que é o sinal exato de que o worker viu a duplicata.
+- O `/metrics` da API não tem autenticação, pensado para a rede interna. Mas o nginx da interface repassa `/api/*` para a API, então `/api/metrics` ficaria público. Bloqueei no nginx com regex sem diferenciar maiúsculas, porque o Express também não diferencia: testei `/api/METRICS`, `/api/metrics/`, `/api/%6Detrics` e `/api//metrics`, todos com 404.
+- A descrição do alerta da fila dizia que o status no cache ficava atrasado. Revendo, não fica: o PATCH invalida o cache e a leitura seguinte vem do MySQL. O impacto real é o histórico atrasado e, se a fila crescer muito, o RabbitMQ bloquear as publicações. Corrigi a descrição e registrei o raciocínio no DECISIONS.
+- Validei o alerta da fila ao vivo: worker parado, 120 mensagens publicadas pela API de gerenciamento do RabbitMQ, alerta em "pending" em menos de 20 s e de volta a "inactive" uns 20 s depois de religar o worker. Na primeira leitura, o `rabbitmqctl list_queues` mostrou a fila vazia logo depois das publicações; as estatísticas das filas são atualizadas de tempos em tempos, e alguns segundos depois apareceram as 121 mensagens.

@@ -9,14 +9,8 @@ const AUDIENCE = 'corridas-api';
 const ONE_YEAR_IN_SECONDS = 365 * 24 * 60 * 60;
 
 const PEOPLE = [
-  { sub: 'passageiro-1', role: 'passageiro' },
-  { sub: 'passageiro-2', role: 'passageiro' },
-  { sub: 'passageiro-3', role: 'passageiro' },
-  { sub: 'passageiro-4', role: 'passageiro' },
-  { sub: 'passageiro-5', role: 'passageiro' },
-  { sub: 'passageiro-6', role: 'passageiro' },
-  { sub: 'motorista-1', role: 'motorista' },
-  { sub: 'motorista-2', role: 'motorista' },
+  ...[1, 2, 3, 4, 5, 6, 7].map((n) => ({ sub: `passageiro-${n}`, role: 'passageiro' })),
+  ...[1, 2].map((n) => ({ sub: `motorista-${n}`, role: 'motorista' })),
 ];
 
 const folder = import.meta.dirname;

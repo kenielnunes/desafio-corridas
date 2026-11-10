@@ -224,7 +224,7 @@ Consultas para colar em http://localhost:9090/query:
 
 **Alertas**
 
-As regras ficam em `observability/alerts.yml`, carregado pelo Prometheus do compose, e em `observability/alerts-prometheusrule.yaml`, as mesmas regras no formato PrometheusRule. O CI confere que os dois arquivos têm os mesmos groups. Por que esses dois alertas e esses limiares: [DECISIONS.md](DECISIONS.md), entrada 7.
+As regras ficam em `observability/alerts.yml`, carregado pelo Prometheus do compose, e em `observability/alerts-prometheusrule.yaml`, as mesmas regras no formato PrometheusRule. O CI confere que os dois arquivos têm os mesmos groups e testa as regras com séries simuladas (`observability/alerts.test.yml`): 10% de erros dispara e 1% não; fila parada acima de 100 dispara e uma rajada que esvazia sozinha não. Por que esses dois alertas e esses limiares: [DECISIONS.md](DECISIONS.md), entrada 7.
 
 Para ver o alerta da fila mudar de estado em http://localhost:9090/alerts:
 

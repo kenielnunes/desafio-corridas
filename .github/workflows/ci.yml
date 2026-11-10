@@ -43,6 +43,11 @@ jobs:
           docker run --rm --entrypoint promtool
           -v "$PWD/observability:/etc/prometheus:ro"
           prom/prometheus:v3.15.1 check config /etc/prometheus/prometheus.yml
+      - name: promtool testa as regras com séries simuladas
+        run: >-
+          docker run --rm --entrypoint promtool
+          -v "$PWD/observability:/etc/prometheus:ro"
+          prom/prometheus:v3.15.1 test rules /etc/prometheus/alerts.test.yml
       - name: alerts.yml e o PrometheusRule têm os mesmos groups
         run: >-
           diff

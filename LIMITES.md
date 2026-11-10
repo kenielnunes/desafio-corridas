@@ -30,7 +30,6 @@ O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram ab
 ## Observabilidade
 
 - **Alertas sem notificação.** Não há Alertmanager; os alertas só aparecem na tela do Prometheus.
-- **Regras sem teste automatizado.** O CI valida a sintaxe com o `promtool` e confere que os dois arquivos de alerta são iguais, mas não testa se cada regra dispara no cenário certo. O `promtool test rules` faz isso com séries simuladas.
 - **`/metrics` sem autenticação.** Chegam nele a rede do compose e o próprio host, porque as portas são publicadas em `127.0.0.1`. O proxy da interface só repassa `/api/corridas`. Em produção, uma NetworkPolicy no cluster ou autenticação no scrape.
 - **Logs só na saída do container.** Não há agregador (Loki, Elasticsearch); a busca pelo correlation id é com `docker compose logs`.
 - **Logs sem rotação e sem limite antes da autenticação.** Cada requisição gera uma linha, inclusive as sem token, e o Docker guarda os logs sem limite de tamanho. Em produção, rotação no coletor e rate limit por IP no ingress, antes da autenticação.

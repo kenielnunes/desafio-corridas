@@ -1,0 +1,65 @@
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: 10% de respostas 5xx por mais de 5 minutos dispara o alerta de erro
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="corridas-api", status_code="200"}'
+        values: '0+90x20'
+      - series: 'http_requests_total{service="corridas-api", status_code="500"}'
+        values: '0+10x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: RidesApiHighErrorRate
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: RidesApiHighErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: Mais de 5% das requisições da API estão falhando com erro 5xx.
+              description: 'Taxa de erros 5xx em 10% nos últimos 5 minutos.'
+
+  - name: 1% de respostas 5xx não dispara
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="corridas-api", status_code="200"}'
+        values: '0+99x20'
+      - series: 'http_requests_total{service="corridas-api", status_code="500"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: RidesApiHighErrorRate
+        exp_alerts: []
+
+  - name: fila parada acima de 100 mensagens por 5 minutos dispara o alerta da fila
+    interval: 1m
+    input_series:
+      - series: 'rabbitmq_detailed_queue_messages_ready{queue="rides.worker", vhost="/"}'
+        values: '150x15'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RidesWorkerQueueBacklog
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: RidesWorkerQueueBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Mensagens acumulando na fila do worker.
+              description: '150 mensagens esperando há mais de 5 minutos: o worker caiu ou não está dando conta. O histórico fica atrasado e, se a fila continuar crescendo, o RabbitMQ chega ao limite de memória ou de disco e bloqueia as publicações da API.'
+
+  - name: rajada que esvazia sozinha em poucos minutos não dispara
+    interval: 1m
+    input_series:
+      - series: 'rabbitmq_detailed_queue_messages_ready{queue="rides.worker", vhost="/"}'
+        values: '0 400 300 150 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: RidesWorkerQueueBacklog
+        exp_alerts: []

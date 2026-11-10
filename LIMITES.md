@@ -28,6 +28,12 @@ O que não fiz, o que faria com mais tempo e os riscos conhecidos que ficaram ab
 - **Contrato do evento duplicado.** O formato existe na API (tipo TypeScript) e no worker (schema zod). Em produção, um pacote compartilhado ou um schema registry.
 - **Reconexão do worker.** Se a conexão com o RabbitMQ cair, o worker encerra e o Docker o reinicia. A API reconecta na publicação seguinte.
 
+## Interface
+
+- **Login de teste.** O login é colar um token. Em produção seria o fluxo do provedor de identidade (OpenID Connect), com o token num cookie HttpOnly gerenciado por um backend da interface, fora do alcance de scripts da página.
+- **Polling.** Cada tela aberta faz uma requisição a cada 2 ou 3 segundos. Com muitos usuários, SSE ou WebSocket reduziria a carga.
+- **Telas sem paginação.** As listas mostram as 20 corridas mais recentes.
+
 ## Testes
 
 - **Node e pnpm.** Os testes exigem Node 24 e pnpm. Subir e validar o sistema exige só Docker.

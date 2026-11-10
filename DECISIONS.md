@@ -119,6 +119,13 @@ Registro das decisões relevantes: contexto, alternativas consideradas, o que es
 - **Histórico no MongoDB:** é append-only, com um documento por evento e o retrato da corrida naquele momento. É consultado por corrida (índice em `rideId` e `version`), e o formato do evento pode evoluir sem migração.
 - **Trade-off:** dois bancos para operar.
 
+## Notas sobre a interface
+
+- **Polling em vez de SSE ou WebSocket.** A tela consulta a corrida a cada 2 segundos. É o que o `GET` com cache foi feito para aguentar, e não exige conexão aberta nem distribuir eventos entre réplicas da API. Com mais tempo, eu usaria SSE alimentado pelo próprio worker.
+- **Mesma origem pelo nginx.** O nginx da interface serve os arquivos e repassa `/api` para a API. O navegador fala com uma origem só, então não há CORS para configurar. O nginx também envia uma Content-Security-Policy restritiva (`default-src 'self'`).
+- **Token no sessionStorage.** É o mínimo para um login de teste colando o token. Some ao fechar a aba, mas um script injetado na página conseguiria lê-lo; a CSP reduz esse risco (ver LIMITES).
+- **Idempotency-Key na tela.** A chave nasce com o formulário e só muda depois de uma criação bem-sucedida. Um duplo clique ou um reenvio depois de um erro de rede reaproveita a mesma chave, e a API devolve a corrida em vez de criar outra.
+
 ## Interpretações de pontos ambíguos
 
 - **`GET /corridas` (lista):** não está no enunciado, mas a tela precisa listar e o motorista precisa achar o que aceitar. Li "motorista só altera status" como "das escritas, o motorista só altera status". O passageiro lista as próprias corridas. O motorista lista as dele por padrão e as solicitadas com `?available=true`. A primeira versão misturava as duas numa lista só, cortada em 50, e as corridas do motorista sumiam quando havia muitas solicitadas mais novas; o QA pegou.

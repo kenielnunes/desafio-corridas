@@ -12,7 +12,7 @@ Pré-requisito: Docker com Compose.
 docker compose up -d --build --wait
 ```
 
-Se a porta 3000 já estiver ocupada na sua máquina, escolha outra e use-a nos comandos abaixo:
+Se a porta 3000 ou a 8080 já estiver ocupada na sua máquina, escolha outra (`API_PORT`, `UI_PORT`) e use-a nos comandos abaixo:
 
 ```bash
 API_PORT=3100 docker compose up -d --build --wait
@@ -20,6 +20,7 @@ API_PORT=3100 docker compose up -d --build --wait
 
 | Serviço           | Endereço               | Observação                                                    |
 | ----------------- | ---------------------- | ------------------------------------------------------------- |
+| Interface         | http://localhost:8080  | login colando um token de teste                               |
 | API               | http://localhost:3000  | `/health/live` e `/health/ready` sem token                    |
 | RabbitMQ (painel) | http://localhost:15672 | usuário `corridas`, senha `corridas_dev` (só desenvolvimento) |
 | Prometheus        | http://localhost:9090  |                                                               |
@@ -32,16 +33,23 @@ Para derrubar tudo e apagar os dados:
 docker compose down -v
 ```
 
+## Usando a interface
+
+1. Abra http://localhost:8080 e cole o conteúdo de `auth-dev/tokens/passageiro-1.jwt` (por exemplo, `cat auth-dev/tokens/passageiro-1.jwt`).
+2. Peça uma corrida. O painel "Acompanhando" consulta a corrida a cada 2 segundos e mostra se a última leitura veio do cache (Redis) ou do banco (MySQL).
+3. Numa janela anônima, entre com `auth-dev/tokens/motorista-1.jwt`, aceite a corrida em "Corridas disponíveis" e depois inicie e finalize em "Minhas corridas".
+4. Na janela do passageiro, o status muda sozinho: Solicitada, Aceita, Em andamento, Finalizada.
+
 ## Tokens de teste
 
 A pasta `auth-dev/tokens/` tem tokens JWT **de teste**, assinados por uma chave privada que foi descartada. A API só conhece a chave pública (`auth-dev/public-key.pem`).
 
-| Arquivo                                 | Para quê                                 |
-| --------------------------------------- | ---------------------------------------- |
-| `passageiro-1.jwt` a `passageiro-6.jwt` | passageiros (o 6 é dos testes do worker) |
-| `motorista-1.jwt` e `motorista-2.jwt`   | motoristas                               |
-| `expired.jwt`                           | demonstrar o 401 de token vencido        |
-| `other-key.jwt`                         | demonstrar o 401 de assinatura inválida  |
+| Arquivo                                 | Para quê                                                  |
+| --------------------------------------- | --------------------------------------------------------- |
+| `passageiro-1.jwt` a `passageiro-7.jwt` | passageiros (o 6 e o 7 são dos testes do worker e do e2e) |
+| `motorista-1.jwt` e `motorista-2.jwt`   | motoristas                                                |
+| `expired.jwt`                           | demonstrar o 401 de token vencido                         |
+| `other-key.jwt`                         | demonstrar o 401 de assinatura inválida                   |
 
 Os tokens valem até novembro de 2027. Para gerar um par de chaves e tokens novos:
 
@@ -173,8 +181,12 @@ Pré-requisito: Node 24 e pnpm (`corepack enable`).
 pnpm install
 pnpm test                                       # unitários (regras da API e decisões do worker)
 pnpm --filter @corridas/api test:api            # testes de API, com o compose de pé
-pnpm --filter @corridas/worker test:integration  # worker: duplicata, DLQ, evento atrasado, fluxo completo
+pnpm --filter @corridas/worker test:integration  # worker: duplicata, DLQ, rajada fora de ordem, fluxo completo
+pnpm e2e                                        # interface com Playwright, no Google Chrome instalado
+pnpm e2e:headed                                 # o mesmo, abrindo o navegador na tela
 ```
+
+Sem o Google Chrome instalado, use o Chromium do Playwright: `pnpm --filter @corridas/e2e exec playwright install chromium` e rode com `CI=1 pnpm e2e`.
 
 Se a API estiver em outra porta, passe `API_URL=http://localhost:3100` para as duas suítes de integração. A suíte respeita o rate limit de 10 requisições de criação por minuto por passageiro; rodando mais de 3 vezes no mesmo minuto, ela começa a receber 429.
 

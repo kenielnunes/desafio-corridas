@@ -50,3 +50,11 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
   - **Cache sem o RabbitMQ:** com o RabbitMQ fora, o cache servia o status antigo por até 5 minutos, porque só o worker atualizava. Agora o `PATCH` apaga a chave, e a leitura seguinte vem do MySQL.
   - **Consumo cancelado:** se o RabbitMQ cancelasse o consumo, o worker continuava "saudável" sem consumir nada. Agora ele encerra e o Docker reinicia.
   - **Logs do worker:** o erro do Redis no log trazia os argumentos do comando, ou seja, a corrida inteira com dados do passageiro. Passei a logar só a mensagem do erro.
+
+## 2026-11-09 (Fase 4: interface, e2e e CI)
+
+- Escrevi a interface num rascunho fora do repositório enquanto os revisores da fase anterior liam o código. Assim não mudei os arquivos nem o `node_modules` que eles estavam usando.
+- O e2e passou de primeira no Google Chrome do WSL (`channel: 'chrome'`): o passageiro pede a corrida e acompanha o motorista aceitar, iniciar e finalizar.
+- No QA visual, com capturas de tela, vi que na tela do motorista as "Corridas disponíveis" vinham primeiro. Com as corridas criadas pelos testes, a lista empurrava "Minhas corridas" (onde ficam Iniciar e Finalizar) para fora da tela. Inverti a ordem.
+- Primeiro deixei um `eslint-disable` do plugin `react-hooks` no hook de polling. O plugin nem está instalado, então o ESLint acusaria uma regra inexistente. Tirei a diretiva e mantive só o comentário explicando a escolha das dependências do `useEffect`.
+- Criei a persona passageiro-7, só para o e2e, pelo mesmo motivo da 6: não disputar a cota do rate limit com as outras suítes.

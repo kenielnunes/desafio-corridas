@@ -21,11 +21,12 @@ API_PORT=3100 docker compose up -d --build --wait
 | Serviço           | Endereço               | Observação                                                    |
 | ----------------- | ---------------------- | ------------------------------------------------------------- |
 | Interface         | http://localhost:8080  | login colando um token de teste                               |
-| API               | http://localhost:3000  | `/health/live` e `/health/ready` sem token                    |
+| API               | http://localhost:3000  | `/health/live`, `/health/ready` e `/metrics` sem token        |
+| Worker            | http://localhost:9464  | `/metrics`, `/health/live` e `/health/ready`                  |
 | RabbitMQ (painel) | http://localhost:15672 | usuário `corridas`, senha `corridas_dev` (só desenvolvimento) |
-| Prometheus        | http://localhost:9090  |                                                               |
+| Prometheus        | http://localhost:9090  | alertas em http://localhost:9090/alerts                       |
 
-Para os testes de integração e para inspeção local, o MongoDB, o Redis e a porta AMQP do RabbitMQ também ficam acessíveis só em `127.0.0.1` (portas 27017, 6379 e 5672, que podem ser trocadas com `MONGO_PORT`, `REDIS_PORT` e `RABBITMQ_PORT`).
+Para os testes de integração e para inspeção local, o MongoDB, o Redis e a porta AMQP do RabbitMQ também ficam acessíveis só em `127.0.0.1` (portas 27017, 6379 e 5672, que podem ser trocadas com `MONGO_PORT`, `REDIS_PORT` e `RABBITMQ_PORT`; a do worker, com `WORKER_PORT`).
 
 Para derrubar tudo e apagar os dados:
 
@@ -171,6 +172,60 @@ curl -s -X POST $API/corridas -H "Authorization: Bearer $P1" -H "Idempotency-Key
   -H 'Content-Type: application/json' -d '{"origin":"Lapa","destination":"Leme"}'
 docker compose logs -f worker      # "falhou; o RabbitMQ vai reentregar", com intervalos crescentes
 docker compose start mongo         # em outro terminal: o próximo intervalo termina em "processado"
+```
+
+## Observabilidade
+
+**Logs em JSON com correlation id, da API até o histórico**
+
+Cada requisição ganha um id de correlação: o `X-Correlation-Id` enviado pelo cliente, se for um UUID, ou um novo. Ele volta no header da resposta, aparece no log da requisição, vai para o worker na propriedade `correlationId` da mensagem AMQP e fica gravado no histórico do MongoDB.
+
+```bash
+CID=$(nova_chave)
+curl -s -X POST $API/corridas -H "Authorization: Bearer $P1" -H "Idempotency-Key: $(nova_chave)" \
+  -H "X-Correlation-Id: $CID" -H 'Content-Type: application/json' -d '{"origin":"Gávea","destination":"Leblon"}'
+sleep 1   # dá tempo de o worker processar o evento
+docker compose logs api worker --no-log-prefix | grep "$CID"   # a requisição na API e o evento no worker
+docker compose exec mongo mongosh --quiet -u corridas -p corridas_dev --authenticationDatabase admin corridas \
+  --eval "db.ride_history.find({ correlationId: '$CID' }, { type: 1, status: 1, correlationId: 1 }).toArray()"
+```
+
+**Métricas**
+
+| Onde                               | Métricas                                                                                                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API, `/metrics`                    | `http_requests_total` e `http_request_duration_seconds` (por método, rota e status), `cache_reads_total` (hit, miss, error), `events_published_total` (ok, failed)           |
+| Worker, `/metrics`                 | `worker_messages_total` (processed, duplicate, invalid, failed), `worker_processing_duration_seconds`, `worker_event_lag_seconds` (da mudança na API até o worker processar) |
+| RabbitMQ, coletado pelo Prometheus | `rabbitmq_detailed_queue_messages_ready` (mensagens esperando em cada fila)                                                                                                  |
+
+Consultas para colar em http://localhost:9090/query:
+
+- taxa de requisições: `sum by (route, status_code) (rate(http_requests_total[1m]))`
+- latência p95 da API: `histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))`
+- proporção de erros 5xx: `sum(rate(http_requests_total{status_code=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))` (sem resultado enquanto não houver nenhum 5xx nos últimos 5 minutos)
+- tamanho da fila: `rabbitmq_detailed_queue_messages_ready{queue="rides.worker"}`
+- atraso p95 da fila: `histogram_quantile(0.95, sum by (le) (rate(worker_event_lag_seconds_bucket[5m])))`
+
+**Alertas**
+
+As regras ficam em `observability/alerts.yml`, carregado pelo Prometheus do compose, e em `observability/alerts-prometheusrule.yaml`, as mesmas regras no formato PrometheusRule. O CI confere que os dois arquivos têm os mesmos groups. Por que esses dois alertas e esses limiares: [DECISIONS.md](DECISIONS.md), entrada 7.
+
+Para ver o alerta da fila mudar de estado em http://localhost:9090/alerts:
+
+```bash
+docker compose stop worker
+for i in $(seq 120); do
+  curl -s -o /dev/null -u corridas:corridas_dev -H 'Content-Type: application/json' \
+    -d '{"properties":{},"routing_key":"corrida.criada","payload":"teste do alerta","payload_encoding":"string"}' \
+    http://localhost:15672/api/exchanges/%2F/rides/publish
+done
+```
+
+Em uns 20 s, o `RidesWorkerQueueBacklog` fica "pending" em http://localhost:9090/alerts, e depois de 5 minutos acima de 100 mensagens, "firing". Para voltar ao normal:
+
+```bash
+docker compose start worker                                       # a fila esvazia e o alerta volta a "inactive"
+docker compose exec rabbitmq rabbitmqctl purge_queue rides.worker.dlq   # as mensagens de teste eram inválidas e foram para a DLQ
 ```
 
 ## Testes

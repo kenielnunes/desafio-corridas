@@ -78,6 +78,10 @@ services:
       JWT_PUBLIC_KEY_FILE: /run/jwt/public-key.pem
       JWT_ISSUER: corridas-auth-dev
       JWT_AUDIENCE: corridas-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: corridas-api
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
     volumes:
       - ./auth-dev/public-key.pem:/run/jwt/public-key.pem:ro
     ports:
@@ -110,6 +114,10 @@ services:
       RABBITMQ_URL: amqp://corridas:corridas_dev@rabbitmq:5672
       MONGO_URL: mongodb://corridas:corridas_dev@mongo:27017/?authSource=admin
       REDIS_URL: redis://:redis_dev@redis:6379
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: corridas-worker
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -147,6 +155,16 @@ services:
       - '127.0.0.1:9090:9090'
     healthcheck:
       test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:9090/-/ready']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  jaeger:
+    image: jaegertracing/jaeger:2.22.0
+    ports:
+      - '127.0.0.1:16686:16686'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:13133/status']
       interval: 5s
       timeout: 3s
       retries: 20

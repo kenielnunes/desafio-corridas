@@ -8,7 +8,11 @@ import { RideHistory } from './history.js';
 import { processMessage } from './processor.js';
 import { declareTopology, QUEUE } from './topology.js';
 
-const log = pino({ base: { service: 'worker' } });
+const log = pino({
+  base: { service: 'worker' },
+  timestamp: pino.stdTimeFunctions.isoTime,
+  formatters: { level: (label) => ({ level: label }) },
+});
 
 const history = await RideHistory.connect(config.mongoUrl);
 const cache = RideCache.connect(config.redisUrl, config.cacheTtlSeconds, (reason) =>

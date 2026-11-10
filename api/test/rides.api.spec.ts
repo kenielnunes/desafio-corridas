@@ -286,6 +286,7 @@ describe('observabilidade', () => {
     const missing = randomUUID();
     await call('GET', `/corridas/${missing}`, { token: token('passageiro-1') });
     await call('GET', '/corridas');
+    await call('GET', '/rota-que-nao-existe');
 
     const response = await fetch(`${API}/metrics`);
     const text = await response.text();
@@ -298,6 +299,7 @@ describe('observabilidade', () => {
     expect(response.status).toBe(200);
     expect(counted('/corridas/:id', 404)).toBe(true);
     expect(counted('/corridas', 401)).toBe(true);
+    expect(counted('unmatched', 404)).toBe(true);
     expect(text).not.toContain(missing);
   });
 });

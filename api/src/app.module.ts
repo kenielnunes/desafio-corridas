@@ -9,6 +9,7 @@ import { RolesGuard } from './auth/roles.guard.js';
 import { config } from './config.js';
 import { EventPublisher } from './events/publisher.js';
 import { HealthController } from './health.controller.js';
+import { INTERNAL_PATHS } from './observability/http-metrics.js';
 import { MetricsController } from './observability/metrics.controller.js';
 import { PrismaService } from './prisma.service.js';
 import { RideCache } from './rides/cache.js';
@@ -24,7 +25,7 @@ import { RidesService } from './rides/rides.service.js';
         formatters: { level: (label) => ({ level: label }) },
         customProps: (request) => ({ correlation_id: request.id }),
         redact: ['req.headers.authorization', 'req.headers.cookie'],
-        autoLogging: { ignore: (request) => /^\/(health|metrics)\b/.test(request.url ?? '') },
+        autoLogging: { ignore: (request) => INTERNAL_PATHS.test(request.url ?? '') },
         serializers: {
           req: (request) => ({ method: request.method, url: request.url }),
           res: (response) => ({ statusCode: response.statusCode }),

@@ -26,6 +26,8 @@ import { RidesService } from './rides/rides.service.js';
         customProps: (request) => ({ correlation_id: request.id }),
         redact: ['req.headers.authorization', 'req.headers.cookie'],
         autoLogging: { ignore: (request) => INTERNAL_PATHS.test(request.url ?? '') },
+        customSuccessMessage: () => 'requisição concluída',
+        customErrorMessage: () => 'requisição com erro',
         serializers: {
           req: (request) => ({ method: request.method, url: request.url }),
           res: (response) => ({ statusCode: response.statusCode }),

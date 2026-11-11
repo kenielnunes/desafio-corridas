@@ -71,7 +71,8 @@ Os tokens valem até novembro de 2027. Para gerar um par de chaves e tokens novo
 
 ```bash
 docker run --rm -v "$PWD/auth-dev:/auth-dev" node:24-alpine node /auth-dev/generate-tokens.mjs
-docker compose restart api
+docker compose restart api                  # a API passa a usar a chave pública nova
+docker compose up -d --build --wait ui      # a interface embute os tokens novos nos botões de login
 ```
 
 ## Roteiro de validação da API

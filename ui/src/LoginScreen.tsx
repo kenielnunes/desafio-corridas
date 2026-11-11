@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react';
 import { api, ApiError } from './api';
 import { ErrorMessage } from './components';
 import { parseToken, type Session } from './session';
+import { TEST_ACCOUNTS } from './testAccounts';
 
 export function LoginScreen({
   onLogin,
@@ -16,7 +17,11 @@ export function LoginScreen({
 
   async function login(event: FormEvent) {
     event.preventDefault();
-    const session = parseToken(token);
+    await enter(token);
+  }
+
+  async function enter(candidate: string) {
+    const session = parseToken(candidate);
     if (!session) {
       setError('Isso não parece um token de passageiro ou de motorista.');
       return;
@@ -42,11 +47,24 @@ export function LoginScreen({
       <form className="card" onSubmit={login}>
         <h1>Corridas</h1>
         {notice && <p className="hint">{notice}</p>}
+        <p>Entrar com uma conta de teste:</p>
+        <div className="accounts">
+          {TEST_ACCOUNTS.map((account) => (
+            <button
+              key={account.label}
+              type="button"
+              disabled={loggingIn}
+              onClick={() => void enter(account.token)}
+            >
+              {account.label}
+            </button>
+          ))}
+        </div>
         <label>
-          Token JWT
+          Ou cole um token JWT
           <textarea
             data-testid="token-input"
-            rows={6}
+            rows={3}
             spellCheck={false}
             autoComplete="off"
             autoCapitalize="off"
@@ -55,7 +73,8 @@ export function LoginScreen({
           />
         </label>
         <p className="hint">
-          Tokens de teste em <code>auth-dev/tokens/</code>.
+          Todos os tokens de teste estão em <code>auth-dev/tokens/</code>; o{' '}
+          <code>expired.jwt</code> e o <code>other-key.jwt</code> mostram o 401.
         </p>
         <ErrorMessage message={error} testId="login-error" />
         <button disabled={loggingIn || !token.trim()} data-testid="login-button">

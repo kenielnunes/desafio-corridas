@@ -89,3 +89,10 @@ test('passageiro não vê a tela do motorista', async ({ page }) => {
   await expect(page.getByTestId('origin')).toBeVisible();
   await expect(page.getByText('Corridas disponíveis')).toHaveCount(0);
 });
+
+test('conta de teste entra sem colar o token', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Motorista 2' }).click();
+  await expect(page.getByTestId('user')).toContainText('motorista-2');
+  await expect(page.getByRole('heading', { name: 'Corridas disponíveis' })).toBeVisible();
+});

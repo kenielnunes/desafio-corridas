@@ -5,6 +5,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY ui/package.json ui/
 RUN pnpm install --frozen-lockfile --filter @corridas/ui
 COPY ui/ ui/
+COPY auth-dev/tokens/ auth-dev/tokens/
 RUN pnpm --filter @corridas/ui build
 
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine

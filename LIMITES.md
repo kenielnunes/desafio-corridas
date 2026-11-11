@@ -66,7 +66,7 @@ Como eu faria, com o que o projeto já tem:
 
 ## Interface
 
-- **Login de teste.** O login é colar um token. Em produção seria o fluxo do provedor de identidade (OpenID Connect), com o token num cookie HttpOnly gerenciado por um backend da interface, fora do alcance de scripts da página.
+- **Login de teste.** O login é escolher uma conta de teste ou colar um token. Os tokens das contas de teste ficam embutidos na interface, o que só é aceitável porque são de teste e já estão no repositório. Em produção seria o fluxo do provedor de identidade (OpenID Connect), com o token num cookie HttpOnly gerenciado por um backend da interface, fora do alcance de scripts da página.
 - **Polling.** Cada tela aberta faz uma requisição a cada 2 ou 3 segundos. Com muitos usuários, SSE ou WebSocket reduziria a carga.
 - **Telas sem paginação.** As listas mostram as 20 corridas mais recentes (para o motorista, só as dele em andamento e as disponíveis).
 - **Token nos artefatos do e2e.** Quando um teste e2e falha, o trace, o vídeo e a captura do Playwright guardam o token digitado, e o CI sobe esses arquivos como artefato. São tokens de teste; com credenciais reais, seria preciso mascarar o campo ou não guardar o trace.

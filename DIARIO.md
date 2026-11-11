@@ -101,3 +101,4 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
 - Antes da entrega, resolvi um limite anotado na Fase 1: o motorista não recebe mais o id do passageiro. O campo some só na resposta da API; o cache e o evento continuam com ele, porque a regra de leitura do passageiro depende dele.
 - A suíte de API falhava se rodasse mais de 3 vezes no mesmo minuto, por causa do próprio rate limit. Agora ela espera o `Retry-After` e segue; rodei 4 vezes seguidas, e a segunda esperou uns 60 s.
 - As regras de alerta ganharam teste no CI, com o `promtool` e séries simuladas. Conferi o caso negativo: com a fila parada em 90, abaixo do limiar, o teste acusa o alerta que não veio.
+- A tela de login pedia para colar o JWT, o que deixava a demonstração com cara de improviso. Pus botões com as contas de teste, que só preenchem o token; a API valida a assinatura do mesmo jeito, e o campo de colar continua para mostrar o 401 com o token vencido.

@@ -34,7 +34,7 @@ docker compose up -d --build --wait
 
 | Serviço           | Endereço               | Observação                                                    |
 | ----------------- | ---------------------- | ------------------------------------------------------------- |
-| Interface         | http://localhost:8080  | login colando um token de teste                               |
+| Interface         | http://localhost:8080  | login pelos botões das contas de teste                        |
 | API               | http://localhost:3000  | `/health/live`, `/health/ready` e `/metrics` sem token        |
 | Worker            | http://localhost:9464  | `/metrics`, `/health/live` e `/health/ready`                  |
 | RabbitMQ (painel) | http://localhost:15672 | usuário `corridas`, senha `corridas_dev` (só desenvolvimento) |
@@ -51,10 +51,12 @@ docker compose down -v
 
 ## Usando a interface
 
-1. Abra http://localhost:8080 e cole o conteúdo de `auth-dev/tokens/passageiro-1.jwt` (por exemplo, `cat auth-dev/tokens/passageiro-1.jwt`).
+1. Abra http://localhost:8080 e clique em **Passageiro 1**.
 2. Peça uma corrida. O painel "Acompanhando" consulta a corrida a cada 2 segundos e mostra se a última leitura veio do cache (Redis) ou do banco (MySQL).
-3. Numa janela anônima, entre com `auth-dev/tokens/motorista-1.jwt`, aceite a corrida em "Corridas disponíveis" e depois inicie e finalize em "Minhas corridas em andamento".
+3. Numa janela anônima, clique em **Motorista 1**, aceite a corrida em "Corridas disponíveis" e depois inicie e finalize em "Minhas corridas em andamento".
 4. Na janela do passageiro, o status muda sozinho: Solicitada, Aceita, Em andamento, Finalizada.
+
+Os botões só preenchem o token de uma conta de teste. O campo "Ou cole um token JWT" aceita qualquer token de `auth-dev/tokens/`, inclusive o `expired.jwt` e o `other-key.jwt`, que mostram o 401.
 
 ## Tokens de teste
 

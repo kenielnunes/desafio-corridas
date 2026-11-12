@@ -102,3 +102,8 @@ Registro cronológico e informal: o que tentei, o que quebrou, como investiguei 
 - A suíte de API falhava se rodasse mais de 3 vezes no mesmo minuto, por causa do próprio rate limit. Agora ela espera o `Retry-After` e segue; rodei 4 vezes seguidas, e a segunda esperou uns 60 s.
 - As regras de alerta ganharam teste no CI, com o `promtool` e séries simuladas. Conferi o caso negativo: com a fila parada em 90, abaixo do limiar, o teste acusa o alerta que não veio.
 - A tela de login pedia para colar o JWT, o que deixava a demonstração com cara de improviso. Pus botões com as contas de teste, que só preenchem o token; a API valida a assinatura do mesmo jeito, e o campo de colar continua para mostrar o 401 com o token vencido.
+
+## 2026-11-12 (CI no GitHub)
+
+- O CI do push da entrega quebrou no job de integração: o Mongo saía com código 1 dois segundos depois de subir. O `docker compose logs` do próprio job mostrou o motivo: a 8.0.34 se recusa a iniciar em kernel 6.19 ou mais novo (SERVER-121912, um problema do TCMalloc da 8.0 com o rseq do kernel). O runner do GitHub já está nesse kernel, e o meu WSL está no 6.18, por isso na minha máquina funcionava.
+- Conferi no binário que a 7.0.48 não tem essa trava nem usa rseq, e fixei o Mongo nela, que é a recomendação da MongoDB até a correção. O volume criado pela 8.0 não abre na 7.0; recriei o meu e rodei de novo os testes de API, de integração do worker e e2e.

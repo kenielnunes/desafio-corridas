@@ -40,7 +40,8 @@ services:
       retries: 20
 
   mongo:
-    image: mongo:8.0.34
+    # 7.0 e não 8.0: a 8.0 se recusa a iniciar em kernel 6.19 ou mais novo (SERVER-121912), que já é o do runner do GitHub
+    image: mongo:7.0.48
     environment:
       MONGO_INITDB_ROOT_USERNAME: corridas
       MONGO_INITDB_ROOT_PASSWORD: corridas_dev
